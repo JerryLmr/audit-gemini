@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-950 text-slate-200 antialiased;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
+  }
+  .glass-nav {
+    @apply bg-white/5 backdrop-blur-md border-b border-white/10 sticky top-0 z-50;
+  }
+}
+
+@media print {
+  nav, footer, .print\:hidden {
+    display: none !important;
+  }
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  .glass-card {
+    background: transparent !important;
+    border: 1px solid #e2e8f0 !important;
+    color: black !important;
+  }
+  .bg-slate-900 {
+    background-color: #1e293b !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+  }
+}
