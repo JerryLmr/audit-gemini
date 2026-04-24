@@ -1,0 +1,38 @@
+{
+  "version": "v2.0",
+  "categories": {
+    "entity": {
+      "ENTITY_PUBLIC_REPAIR_OBJECT": "项目属于共用部位或共用设施设备维修对象。",
+      "ENTITY_PRIVATE_PART_NOT_ELIGIBLE": "项目属于业主专有部分，不符合维修资金使用条件。",
+      "ENTITY_PROPERTY_SERVICE_SCOPE": "项目属于物业日常服务或维保范围，不符合维修资金使用条件。",
+      "ENTITY_IN_WARRANTY_NOT_ELIGIBLE": "项目明确仍在保修期内，不符合专项维修资金保修期满后使用口径。",
+      "ENTITY_WARRANTY_UNKNOWN_NEED_REVIEW": "保修状态缺失或无法判断，需补充保修期满依据后人工复核。",
+      "ENTITY_IN_WARRANTY": "保修状态展示提示；当前四层审计不主动发出。",
+      "ENTITY_OBJECT_UNKNOWN_MANUAL_REVIEW": "项目本体对象或范围无法确认，需人工复核。",
+      "ENTITY_FIELD_CONFLICT_MANUAL_REVIEW": "项目目录语义与来源字段存在冲突，需人工复核。"
+    },
+    "trace": {
+      "TRACE_MISSING_VOTE_TRACE": "缺少业主表决痕迹，仅作为补充材料提示。",
+      "TRACE_MISSING_CONSTRUCTION_CONTRACT": "缺少施工合同痕迹，仅作为补充材料提示。",
+      "TRACE_MISSING_APPRAISAL_CONTRACT": "缺少审价合同痕迹，仅作为补充材料提示。",
+      "TRACE_MISSING_APPRAISAL_REPORT": "缺少审价报告痕迹，仅作为补充材料提示。",
+      "TRACE_NEED_CONSTRUCTION_CONTRACT_NOT_SIGNED": "需要施工合同但未见签署痕迹，仅作为补充材料提示。"
+    },
+    "process": {
+      "PROCESS_NORMAL_VOTE_MISSING": "普通维修缺少表决流程信息。",
+      "PROCESS_NORMAL_VOTE_NOT_LEGAL": "普通维修表决通过率未达到当前口径或无法确认。",
+      "PROCESS_NORMAL_CONSTRUCTION_BEFORE_VOTE_REVIEW": "旧版普通维修流程时序提示；当前四层审计不主动发出。",
+      "PROCESS_VOTE_DATE_MISSING": "缺少表决日期，无法完成普通维修时序校验。",
+      "PROCESS_CONSTRUCTION_BEFORE_VOTE_CONFIRMED": "普通维修已确认存在先开工后表决的流程时序风险。",
+      "PROCESS_VOTE_DATE_PROXY_USED": "当前 vote_date 使用征询日期或录入日期代替，仅用于展示和弱校验。",
+      "PROCESS_EMERGENCY_FLOW_EXEMPTED": "紧急维修仅豁免普通流程，不豁免本体合规。",
+      "PROCESS_EMERGENCY_TRACE_REVIEW_REQUIRED": "紧急维修资料痕迹仍需补充或人工复核。",
+      "PROCESS_PROPERTY_VALUE_UNSUPPORTED": "工程性质 property 值不在当前支持范围内，需人工复核输入口径。"
+    },
+    "amount": {
+      "AMOUNT_BUDGET_DISPLAY": "预算金额展示项。",
+      "AMOUNT_CONTRACT_DISPLAY": "合同金额展示项。",
+      "AMOUNT_INFO_MISSING": "金额信息缺失，仅影响展示完整性。"
+    }
+  }
+}

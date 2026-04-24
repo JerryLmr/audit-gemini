@@ -1,0 +1,207 @@
+{
+  "version": "v2.0",
+  "description": "字段映射层规则集中配置。业务审计不得绕过这些标准字段。",
+  "source_aliases": {
+    "t_workspace": ["t_workspace", "工程信息主表", "工程信息表", "T_Workspace"],
+    "ws_project": ["ws_project", "Ws_project", "三审工程维修项目表"],
+    "blueprint": ["blueprint", "Blueprint", "维修决案"],
+    "blueprint_draft": ["blueprint_draft", "Blueprint_draft", "维修预案"],
+    "hou_notion_sum": ["hou_notion_sum", "Hou_notion_sum", "业主表决汇总表"],
+    "project_contract": ["project_contract", "Project_contract", "施工合同表"],
+    "excel": ["excel", "xlsx", "Excel"],
+    "ocr": ["ocr", "OCR"],
+    "text": ["text", "文本输入"]
+  },
+  "rules": [
+    {
+      "standard_field": "project_name",
+      "sources": [
+        { "source": "t_workspace", "field": "wsname" },
+        { "source": "blueprint", "field": "wsname" },
+        { "source": "blueprint_draft", "field": "wsname" },
+        { "source": "project_contract", "field": "name" },
+        { "source": "text", "field": "project_name" }
+      ],
+      "mapping_rule": "按来源优先级取第一个非空工程名称。"
+    },
+    {
+      "standard_field": "project_item_code",
+      "sources": [
+        { "source": "t_workspace", "field": "wscode" },
+        { "source": "blueprint", "field": "wscode" },
+        { "source": "blueprint_draft", "field": "wscode" },
+        { "source": "project_contract", "field": "code" },
+        { "source": "t_workspace", "field": "wsid" }
+      ],
+      "mapping_rule": "按来源优先级取第一个非空工程编号或工程 ID。"
+    },
+    {
+      "standard_field": "is_emergency_repair",
+      "sources": [
+        { "source": "t_workspace", "field": "property" },
+        { "source": "blueprint", "field": "property" },
+        { "source": "blueprint_draft", "field": "property" }
+      ],
+      "mapping_rule": "property == 1 映射为 false；property == 2 映射为 true；其他非空值不静默处理，property_value_valid=false 并进入人工复核。当前版本仅支持 1/2。"
+    },
+    {
+      "standard_field": "property_raw_value",
+      "sources": [
+        { "source": "t_workspace", "field": "property" },
+        { "source": "blueprint", "field": "property" },
+        { "source": "blueprint_draft", "field": "property" }
+      ],
+      "mapping_rule": "记录 property 原始值，仅用于解释和人工复核。"
+    },
+    {
+      "standard_field": "property_value_valid",
+      "sources": [
+        { "source": "t_workspace", "field": "property" },
+        { "source": "blueprint", "field": "property" },
+        { "source": "blueprint_draft", "field": "property" }
+      ],
+      "mapping_rule": "property 缺失、为空、1、2 为当前可处理范围；其他值为 false，并写入 field_mapping_layer.warnings。"
+    },
+    {
+      "standard_field": "repair_nature",
+      "sources": [
+        { "source": "derived", "field": "is_emergency_repair" }
+      ],
+      "mapping_rule": "is_emergency_repair 为 true 时映射为 emergency；false 时映射为 normal；property 非法时映射为 unknown。"
+    },
+    {
+      "standard_field": "warranty_status",
+      "sources": [
+        { "source": "blueprint", "field": "expirer_remark" },
+        { "source": "blueprint_draft", "field": "expirer_remark" }
+      ],
+      "mapping_rule": "expirer_remark 缺失或为空 -> in_warranty；包含“过保”等 -> out_of_warranty；其他 -> in_warranty。仅适用于当前数据展示，不参与本轮合规结论。"
+    },
+    {
+      "standard_field": "has_construction_contract",
+      "sources": [
+        { "source": "ws_project", "field": "is_signed_pc" }
+      ],
+      "mapping_rule": "1/true/是/Y 映射为 true，0/false/否/N 映射为 false。"
+    },
+    {
+      "standard_field": "has_appraisal_contract",
+      "sources": [
+        { "source": "ws_project", "field": "is_signed_esc" }
+      ],
+      "mapping_rule": "1/true/是/Y 映射为 true，0/false/否/N 映射为 false。"
+    },
+    {
+      "standard_field": "has_appraisal_report",
+      "sources": [
+        { "source": "ws_project", "field": "is_signed_esr" }
+      ],
+      "mapping_rule": "1/true/是/Y 映射为 true，0/false/否/N 映射为 false。"
+    },
+    {
+      "standard_field": "need_construction_contract",
+      "sources": [
+        { "source": "ws_project", "field": "need_con" },
+        { "source": "t_workspace", "field": "need_pro_contract" }
+      ],
+      "mapping_rule": "1/true/是/Y 映射为 true，0/false/否/N 映射为 false。"
+    },
+    {
+      "standard_field": "has_vote_trace",
+      "sources": [
+        { "source": "hou_notion_sum", "field": "__row_exists__" },
+        { "source": "t_workspace", "field": "is_voted" }
+      ],
+      "mapping_rule": "Hou_notion_sum 存在记录即 true；否则按 is_voted 布尔值映射。"
+    },
+    {
+      "standard_field": "vote_pass_rate_by_household",
+      "sources": [
+        { "source": "hou_notion_sum", "field": "vote_household_fields" }
+      ],
+      "mapping_rule": "按同意户数 / 总户数计算；字段不足时为 null。"
+    },
+    {
+      "standard_field": "vote_pass_rate_by_area",
+      "sources": [
+        { "source": "hou_notion_sum", "field": "vote_area_fields" }
+      ],
+      "mapping_rule": "按同意面积 / 总面积计算；字段不足时为 null。"
+    },
+    {
+      "standard_field": "vote_legal",
+      "sources": [
+        { "source": "hou_notion_sum", "field": "vote_rate_fields" }
+      ],
+      "mapping_rule": "户数和面积通过率均达到三分之二时为 true；任一无法计算时为 null。"
+    },
+    {
+      "standard_field": "vote_date",
+      "sources": [
+        { "source": "hou_notion_sum", "field": "request_enddate" },
+        { "source": "hou_notion_sum", "field": "request_startdate" },
+        { "source": "hou_notion_sum", "field": "reg_date" }
+      ],
+      "mapping_rule": "优先使用 request_enddate；缺失时使用 request_startdate 弱替代；再缺失时使用 reg_date 弱替代。统一规范化为 YYYY-MM-DD。"
+    },
+    {
+      "standard_field": "vote_date_is_proxy",
+      "sources": [
+        { "source": "derived", "field": "vote_date" }
+      ],
+      "mapping_rule": "vote_date 来自 request_startdate 或 reg_date 时为 true；来自 request_enddate 时为 false；缺失时为 null。"
+    },
+    {
+      "standard_field": "construction_start_date",
+      "sources": [
+        { "source": "project_contract", "field": "startup_date" }
+      ],
+      "mapping_rule": "YYYYMMDD 或 ISO 日期字符串规范化为 YYYY-MM-DD。"
+    },
+    {
+      "standard_field": "is_before_vote_construct",
+      "sources": [
+        { "source": "derived", "field": "construction_start_date/vote_date" }
+      ],
+      "mapping_rule": "仅普通维修且 construction_start_date、vote_date 均存在时计算；construction_start_date < vote_date 为 true，否则 false。"
+    },
+    {
+      "standard_field": "budget_amount",
+      "sources": [
+        { "source": "project_contract", "field": "orgn_amt" },
+        { "source": "ws_project", "field": "orgn_amt" },
+        { "source": "blueprint", "field": "orgn_amt" },
+        { "source": "blueprint_draft", "field": "orgn_amt" }
+      ],
+      "mapping_rule": "转为 number；按来源优先级取第一个可解析值。"
+    },
+    {
+      "standard_field": "contract_amount",
+      "sources": [
+        { "source": "project_contract", "field": "contract_amt" }
+      ],
+      "mapping_rule": "转为 number。"
+    },
+    {
+      "standard_field": "is_public_part",
+      "sources": [
+        { "source": "catalog_mapping", "field": "project_name" }
+      ],
+      "mapping_rule": "通过 repairable_object_catalog.json 和项目名称映射共用部位/共用设施设备。"
+    },
+    {
+      "standard_field": "is_private_part",
+      "sources": [
+        { "source": "catalog_mapping", "field": "project_name" }
+      ],
+      "mapping_rule": "通过项目名称明显户内/室内/专有语义辅助推断；与目录冲突时进入人工复核。"
+    },
+    {
+      "standard_field": "is_property_service_scope",
+      "sources": [
+        { "source": "catalog_mapping", "field": "project_name" }
+      ],
+      "mapping_rule": "通过绿化养护、清洁卫生、检测检查等日常服务语义辅助推断。"
+    }
+  ]
+}

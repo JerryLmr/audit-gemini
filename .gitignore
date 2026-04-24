@@ -1,0 +1,26 @@
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Local tool files
+.codex
+
+# Python (backend)
+backend/.venv/
+backend/.pytest_cache/
+backend/**/__pycache__/
+*.pyc
+
+# Node (frontend)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.vite-temp/
+
+# Env / logs
+backend/.env
+frontend/.env
+frontend/.env.local
+*.log
+

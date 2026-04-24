@@ -1,0 +1,642 @@
+{
+  "version": "v2",
+  "updated_at": "2026-04-17",
+  "notes": [
+    "当前四层审计只直接发出 ENTITY_、TRACE_、PROCESS_、AMOUNT_ 类 v2 reason_code。",
+    "除 AMOUNT_* 外，当前实际发出的 entity/trace/process reason_code 均应解析出至少一条允许法规来源。",
+    "basis_strength=strong 表示直接法条支撑；weak 表示背景性法规加审计推导；none 表示金额展示不绑定法规。",
+    "legacy_deprecated_entries 中的旧 code 当前四层审计不再发出，仅保留迁移说明。",
+    "reserved_entries 中的 code 为后续规则扩展预留，当前引擎不直接发出。"
+  ],
+  "entries": {
+    "ENTITY_PUBLIC_REPAIR_OBJECT": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第十八条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第十八条",
+        "section": "专项用于共用部位、共用设施设备保修期满后的维修和更新、改造",
+        "basis_explanation": "项目属于共用部位或共用设施设备维修对象，本体合规可按维修资金用途范围进行初步判断。",
+        "basis_strength": "strong",
+        "primary": true
+      },
+      {
+        "display_name": "《上海市商品住宅维修基金管理办法》（上海市人民政府令第91号）第十三条",
+        "source_type": "regulation",
+        "title": "上海市商品住宅维修基金管理办法",
+        "issuer": "上海市人民政府",
+        "document_no": "上海市人民政府令第91号",
+        "article": "第十三条",
+        "section": "维修基金用途范围",
+        "basis_explanation": "项目属于共用部位或共用设施设备维修对象，本体合规可按维修基金用途范围进行初步判断。",
+        "basis_strength": "strong",
+        "primary": false
+      }
+    ],
+    "ENTITY_PRIVATE_PART_NOT_ELIGIBLE": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第十八条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第十八条",
+        "section": "维修资金用途限于共用部位、共用设施设备，专有部分按反向解释不属于该用途范围",
+        "basis_explanation": "维修资金用途限于共用部位、共用设施设备，专有部分项目按用途范围反向解释不属于列支对象。",
+        "basis_strength": "strong",
+        "primary": true
+      },
+      {
+        "display_name": "《上海市商品住宅维修基金管理办法》（上海市人民政府令第91号）第十三条",
+        "source_type": "regulation",
+        "title": "上海市商品住宅维修基金管理办法",
+        "issuer": "上海市人民政府",
+        "document_no": "上海市人民政府令第91号",
+        "article": "第十三条",
+        "section": "维修基金用途范围，专有部分按反向解释不属于该用途范围",
+        "basis_explanation": "维修基金用途限于规定范围，专有部分项目按用途范围反向解释不属于列支对象。",
+        "basis_strength": "strong",
+        "primary": false
+      }
+    ],
+    "ENTITY_PROPERTY_SERVICE_SCOPE": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十五条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十五条",
+        "section": "依法应由建设单位或者施工单位承担的费用、依法应由相关单位承担的供水供电供气供热通讯有线电视等管线设施设备维修养护费用、应由当事人承担的人为损坏修复费用以及物业服务合同约定应由物业服务企业承担的维修养护费用，不得从住宅专项维修资金中列支",
+        "basis_explanation": "属于物业日常服务或维保范围的事项，不应从住宅专项维修资金中列支。",
+        "basis_strength": "strong",
+        "primary": true
+      },
+      {
+        "display_name": "《上海市住宅物业管理服务规范》（DB31/T 360-2020）第7章",
+        "source_type": "standard",
+        "title": "上海市住宅物业管理服务规范",
+        "issuer": "上海市市场监督管理局",
+        "document_no": "DB31/T 360-2020",
+        "article": "第7章",
+        "section": "保洁、清洁、卫生类物业服务范围",
+        "basis_explanation": "保洁、清洁、卫生类项目属于物业服务范围时，应按物业服务事项核验。",
+        "basis_strength": "strong",
+        "primary": false
+      },
+      {
+        "display_name": "《上海市住宅物业管理服务规范》（DB31/T 360-2020）第8章",
+        "source_type": "standard",
+        "title": "上海市住宅物业管理服务规范",
+        "issuer": "上海市市场监督管理局",
+        "document_no": "DB31/T 360-2020",
+        "article": "第8章",
+        "section": "绿化、树木修剪、绿化养护类物业服务范围",
+        "basis_explanation": "绿化、树木修剪、绿化养护类项目属于物业服务范围时，应按物业服务事项核验。",
+        "basis_strength": "strong",
+        "primary": false
+      }
+    ],
+    "ENTITY_IN_WARRANTY_NOT_ELIGIBLE": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二条、第十八条",
+        "display_text": "住宅专项维修资金管理办法 第二条、第十八条：专项维修资金用于保修期满后的共用部位、共用设施设备维修和更新、改造。",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二条、第十八条",
+        "section": "专项维修资金用于保修期满后的共用部位、共用设施设备维修和更新、改造",
+        "basis_explanation": "项目明确仍在保修期内时，不符合专项维修资金保修期满后使用口径。",
+        "basis_strength": "strong",
+        "primary": true
+      },
+      {
+        "display_name": "《物业管理条例》第五十三条",
+        "display_text": "物业管理条例 第五十三条：专项维修资金用于物业保修期满后共用部位、共用设施设备的维修和更新、改造。",
+        "source_type": "regulation",
+        "title": "物业管理条例",
+        "issuer": "国务院",
+        "document_no": "",
+        "article": "第五十三条",
+        "section": "专项维修资金用于物业保修期满后共用部位、共用设施设备的维修和更新、改造",
+        "basis_explanation": "项目明确在保时，应先核验保修责任，不宜直接列支专项维修资金。",
+        "basis_strength": "strong",
+        "primary": false
+      }
+    ],
+    "ENTITY_WARRANTY_UNKNOWN_NEED_REVIEW": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二条、第十八条",
+        "display_text": "住宅专项维修资金管理办法 第二条、第十八条：专项维修资金使用需核验是否属于保修期满后的维修事项。",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二条、第十八条",
+        "section": "保修期满后使用口径背景依据",
+        "basis_explanation": "当前保修状态缺失或无法判断，需补充保修期满依据后复核。",
+        "basis_strength": "weak",
+        "primary": true
+      },
+      {
+        "display_name": "《物业管理条例》第五十三条",
+        "display_text": "物业管理条例 第五十三条：专项维修资金使用需结合物业保修期满后条件核验。",
+        "source_type": "regulation",
+        "title": "物业管理条例",
+        "issuer": "国务院",
+        "document_no": "",
+        "article": "第五十三条",
+        "section": "物业保修期满后共用部位、共用设施设备维修",
+        "basis_explanation": "当前缺少保修期满依据，建议补充材料并人工复核。",
+        "basis_strength": "weak",
+        "primary": false
+      }
+    ],
+    "ENTITY_IN_WARRANTY": [
+      {
+        "display_name": "保修状态展示口径（当前四层审计不主动发出）",
+        "source_type": "business_rule",
+        "title": "维修资金项目字段映射规则",
+        "issuer": "",
+        "document_no": "",
+        "article": "",
+        "section": "expirer_remark 映射 warranty_status；仅当前数据集展示口径，不参与本轮合规结论",
+        "basis_strength": "weak",
+        "current_four_layer_used": false,
+        "deprecated": true,
+        "primary": true
+      }
+    ],
+    "ENTITY_OBJECT_UNKNOWN_MANUAL_REVIEW": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第十八条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第十八条",
+        "section": "共用部位、共用设施设备用途范围背景依据",
+        "basis_explanation": "维修资金用途应限于共用部位、共用设施设备；当前对象范围无法确认，建议核验。",
+        "basis_strength": "weak",
+        "primary": true
+      },
+      {
+        "display_name": "《上海市商品住宅维修基金管理办法》（上海市人民政府令第91号）第十三条",
+        "source_type": "regulation",
+        "title": "上海市商品住宅维修基金管理办法",
+        "issuer": "上海市人民政府",
+        "document_no": "上海市人民政府令第91号",
+        "article": "第十三条",
+        "section": "维修基金用途范围背景依据",
+        "basis_explanation": "维修基金使用范围需结合维修对象核验；当前对象范围无法确认，建议核验。",
+        "basis_strength": "weak",
+        "primary": false
+      }
+    ],
+    "ENTITY_FIELD_CONFLICT_MANUAL_REVIEW": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第十八条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第十八条",
+        "section": "对象范围冲突复核背景依据",
+        "basis_explanation": "维修资金用途应限于共用部位、共用设施设备；当前标准字段存在冲突，建议核验对象范围。",
+        "basis_strength": "weak",
+        "primary": true
+      },
+      {
+        "display_name": "《上海市商品住宅维修基金管理办法》（上海市人民政府令第91号）第十三条",
+        "source_type": "regulation",
+        "title": "上海市商品住宅维修基金管理办法",
+        "issuer": "上海市人民政府",
+        "document_no": "上海市人民政府令第91号",
+        "article": "第十三条",
+        "section": "维修基金用途范围背景依据",
+        "basis_explanation": "维修基金使用范围需结合维修对象核验；当前标准字段存在冲突，建议核验对象范围。",
+        "basis_strength": "weak",
+        "primary": false
+      }
+    ],
+    "TRACE_MISSING_VOTE_TRACE": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十二条、第二十三条",
+        "section": "普通维修表决程序背景依据",
+        "basis_explanation": "维修资金使用应履行业主表决程序，本系统未发现相关业务痕迹，建议补充核验。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "TRACE_MISSING_CONSTRUCTION_CONTRACT": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十四条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十四条",
+        "section": "维修资金使用程序材料背景依据",
+        "basis_explanation": "依据维修资金使用程序要求，通常应具备施工合同等材料，本系统未发现相关痕迹，建议补充核验。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "TRACE_MISSING_APPRAISAL_CONTRACT": [
+      {
+        "display_name": "《上海市商品住宅维修基金管理办法》（上海市人民政府令第91号）第十三条",
+        "source_type": "regulation",
+        "title": "上海市商品住宅维修基金管理办法",
+        "issuer": "上海市人民政府",
+        "document_no": "上海市人民政府令第91号",
+        "article": "第十三条",
+        "section": "审价合同痕迹背景依据",
+        "basis_explanation": "为核验资金合理使用，通常需审价合同等过程依据，本系统未发现相关痕迹，建议补充核验。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "TRACE_MISSING_APPRAISAL_REPORT": [
+      {
+        "display_name": "《上海市商品住宅维修基金管理办法》（上海市人民政府令第91号）第十三条",
+        "source_type": "regulation",
+        "title": "上海市商品住宅维修基金管理办法",
+        "issuer": "上海市人民政府",
+        "document_no": "上海市人民政府令第91号",
+        "article": "第十三条",
+        "section": "审价报告痕迹背景依据",
+        "basis_explanation": "为确保资金合理使用，通常需审价依据，本系统未发现相关痕迹，建议补充核验。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "TRACE_NEED_CONSTRUCTION_CONTRACT_NOT_SIGNED": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第十八条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第十八条",
+        "section": "施工合同依据背景提示",
+        "basis_explanation": "根据资金用途规范，项目使用维修资金通常应具备合同依据；本系统未发现施工合同签署痕迹，建议补充核验。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "PROCESS_NORMAL_VOTE_MISSING": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十二条、第二十三条",
+        "section": "普通维修表决程序背景依据",
+        "basis_explanation": "普通维修资金使用应履行业主表决程序，本系统未发现流程信息，建议补充核验。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "PROCESS_NORMAL_VOTE_NOT_LEGAL": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十二条、第二十三条",
+        "section": "普通维修表决程序",
+        "basis_explanation": "普通维修表决合法性按维修资金使用程序和共同决定事项进行核验。",
+        "basis_strength": "strong",
+        "primary": true
+      },
+      {
+        "display_name": "《中华人民共和国民法典》第二百七十八条、第二百八十一条",
+        "source_type": "law",
+        "title": "中华人民共和国民法典",
+        "issuer": "全国人民代表大会",
+        "document_no": "",
+        "article": "第二百七十八条、第二百八十一条",
+        "section": "共同决定事项与维修资金使用",
+        "basis_explanation": "维修资金使用涉及业主共同决定事项，表决合法性需结合民法典共同决定规则核验。",
+        "basis_strength": "strong",
+        "primary": false
+      }
+    ],
+    "PROCESS_NORMAL_CONSTRUCTION_BEFORE_VOTE_REVIEW": [
+      {
+        "display_name": "旧版普通维修流程时序复核提示（当前四层审计不主动发出）",
+        "source_type": "business_rule",
+        "title": "流程合规审计",
+        "issuer": "",
+        "document_no": "",
+        "article": "",
+        "section": "已由 PROCESS_VOTE_DATE_MISSING / PROCESS_CONSTRUCTION_BEFORE_VOTE_CONFIRMED 替代",
+        "basis_strength": "weak",
+        "current_four_layer_used": false,
+        "deprecated": true,
+        "primary": true
+      }
+    ],
+    "PROCESS_VOTE_DATE_MISSING": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十二条、第二十三条",
+        "section": "普通维修表决时序校验背景依据",
+        "basis_explanation": "维修资金使用应履行表决程序；当前缺少表决日期，无法完成流程时序校验，建议补充核验。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "PROCESS_CONSTRUCTION_BEFORE_VOTE_CONFIRMED": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十二条、第二十三条",
+        "section": "普通维修表决程序时序复核背景依据",
+        "basis_explanation": "维修资金使用应履行表决程序；当前发现施工时间早于表决时间，建议核查流程合规性。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "PROCESS_VOTE_DATE_PROXY_USED": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十二条、第二十三条",
+        "section": "表决日期代用字段背景提示",
+        "basis_explanation": "普通维修资金使用应履行表决程序；当前 vote_date 使用征询日期或录入日期代替，仅用于展示和弱校验。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "PROCESS_EMERGENCY_FLOW_EXEMPTED": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十四条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十四条",
+        "section": "紧急使用维修资金",
+        "basis_explanation": "紧急情况下可按特别程序处理，紧急维修仅豁免普通流程，不豁免本体合规。",
+        "basis_strength": "strong",
+        "primary": true
+      },
+      {
+        "display_name": "《上海市商品住宅维修基金管理办法》（上海市人民政府令第91号）第十四条",
+        "source_type": "regulation",
+        "title": "上海市商品住宅维修基金管理办法",
+        "issuer": "上海市人民政府",
+        "document_no": "上海市人民政府令第91号",
+        "article": "第十四条",
+        "section": "紧急维修实施",
+        "basis_explanation": "紧急维修可按上海维修基金管理办法规定的紧急维修程序处理。",
+        "basis_strength": "strong",
+        "primary": false
+      },
+      {
+        "display_name": "《关于加强物业定期维修、紧急维修以及维修资金管理若干问题的通知》（沪房管物〔2011〕326号）第二条至第四条",
+        "source_type": "regulation",
+        "title": "关于加强物业定期维修、紧急维修以及维修资金管理若干问题的通知",
+        "issuer": "上海市住房保障和房屋管理局",
+        "document_no": "沪房管物〔2011〕326号",
+        "article": "第二条至第四条",
+        "section": "紧急维修范围与流程，紧急情况下可按特别程序处理",
+        "basis_explanation": "紧急维修应结合范围、流程和事后材料进行核验。",
+        "basis_strength": "strong",
+        "primary": false
+      }
+    ],
+    "PROCESS_EMERGENCY_TRACE_REVIEW_REQUIRED": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十四条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第二十四条",
+        "section": "紧急使用维修资金背景依据",
+        "basis_explanation": "紧急情况下可按特别程序处理；本系统未发现完整事后资料痕迹，建议补充核验。",
+        "basis_strength": "weak",
+        "primary": true
+      },
+      {
+        "display_name": "《关于加强物业定期维修、紧急维修以及维修资金管理若干问题的通知》（沪房管物〔2011〕326号）第二条至第四条",
+        "source_type": "regulation",
+        "title": "关于加强物业定期维修、紧急维修以及维修资金管理若干问题的通知",
+        "issuer": "上海市住房保障和房屋管理局",
+        "document_no": "沪房管物〔2011〕326号",
+        "article": "第二条至第四条",
+        "section": "紧急维修事后资料与流程复核背景依据",
+        "basis_explanation": "紧急维修应结合范围与流程材料进行事后核验。",
+        "basis_strength": "weak",
+        "primary": false
+      }
+    ],
+    "PROCESS_PROPERTY_VALUE_UNSUPPORTED": [
+      {
+        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第十八条、第二十四条",
+        "source_type": "regulation",
+        "title": "住宅专项维修资金管理办法",
+        "issuer": "建设部、财政部",
+        "document_no": "建设部、财政部令第165号",
+        "article": "第十八条、第二十四条",
+        "section": "维修对象范围与紧急维修路径背景依据",
+        "basis_explanation": "工程性质会影响普通维修与紧急维修路径；当前 property 值不在系统支持范围内，建议核验输入口径。",
+        "basis_strength": "weak",
+        "primary": true
+      }
+    ],
+    "AMOUNT_BUDGET_DISPLAY": [],
+    "AMOUNT_CONTRACT_DISPLAY": [],
+    "AMOUNT_INFO_MISSING": []
+  },
+  "default_compliant_basis": {
+    "trace_audit": {
+      "normal": [
+        {
+          "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
+          "source_type": "regulation",
+          "title": "住宅专项维修资金管理办法",
+          "issuer": "建设部、财政部",
+          "document_no": "建设部、财政部令第165号",
+          "article": "第二十二条、第二十三条",
+          "section": "资料痕迹满足表决程序要求的默认展示依据",
+          "basis_explanation": "资料/手续痕迹字段齐备，当前按普通维修表决程序依据展示。",
+          "basis_strength": "weak",
+          "primary": true
+        }
+      ],
+      "emergency": [
+        {
+          "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十四条",
+          "source_type": "regulation",
+          "title": "住宅专项维修资金管理办法",
+          "issuer": "建设部、财政部",
+          "document_no": "建设部、财政部令第165号",
+          "article": "第二十四条",
+          "section": "紧急维修资料痕迹通过态默认展示依据",
+          "basis_explanation": "紧急维修资料/手续痕迹字段齐备，当前按紧急使用维修资金程序依据展示。",
+          "basis_strength": "strong",
+          "primary": true
+        },
+        {
+          "display_name": "《关于加强物业定期维修、紧急维修以及维修资金管理若干问题的通知》（沪房管物〔2011〕326号）第二条至第四条",
+          "source_type": "regulation",
+          "title": "关于加强物业定期维修、紧急维修以及维修资金管理若干问题的通知",
+          "issuer": "上海市住房保障和房屋管理局",
+          "document_no": "沪房管物〔2011〕326号",
+          "article": "第二条至第四条",
+          "section": "紧急维修范围与流程通过态默认展示依据",
+          "basis_explanation": "紧急维修资料/手续痕迹字段齐备，当前按紧急维修范围与流程依据展示。",
+          "basis_strength": "strong",
+          "primary": false
+        }
+      ]
+    },
+    "process_audit": {
+      "normal": [
+        {
+          "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
+          "source_type": "regulation",
+          "title": "住宅专项维修资金管理办法",
+          "issuer": "建设部、财政部",
+          "document_no": "建设部、财政部令第165号",
+          "article": "第二十二条、第二十三条",
+          "section": "普通维修流程通过态默认展示依据",
+          "basis_explanation": "普通维修流程字段初步通过，当前按普通维修表决程序依据展示。",
+          "basis_strength": "weak",
+          "primary": true
+        }
+      ],
+      "emergency": [
+        {
+          "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十四条",
+          "source_type": "regulation",
+          "title": "住宅专项维修资金管理办法",
+          "issuer": "建设部、财政部",
+          "document_no": "建设部、财政部令第165号",
+          "article": "第二十四条",
+          "section": "紧急维修流程通过态默认展示依据",
+          "basis_explanation": "紧急维修流程初步通过，当前按紧急使用维修资金程序依据展示。",
+          "basis_strength": "strong",
+          "primary": true
+        }
+      ]
+    }
+  },
+  "reserved_entries": {
+    "EMERGENCY_SCOPE_ALLOWED": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "strong",
+      "basis_hint": "住宅专项维修资金管理办法第二十四条；上海市商品住宅维修基金管理办法第十四条；沪房管物〔2011〕326号第二条至第四条"
+    },
+    "EMERGENCY_SCOPE_UNCLEAR": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "strong",
+      "basis_hint": "紧急维修范围不清时使用，不复用普通维修 code"
+    },
+    "EMERGENCY_PROCEDURE_SIMPLIFIED": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "strong",
+      "deprecated_alias_of": "PROCESS_EMERGENCY_FLOW_EXEMPTED"
+    },
+    "EMERGENCY_NOT_SUPPORTED_BY_SCOPE": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "strong",
+      "basis_hint": "紧急维修不豁免本体合规"
+    },
+    "EMERGENCY_MISSING_POST_RECORD": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "weak",
+      "deprecated_alias_of": "PROCESS_EMERGENCY_TRACE_REVIEW_REQUIRED"
+    },
+    "VOTE_NOT_LEGAL": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "strong",
+      "deprecated_alias_of": "PROCESS_NORMAL_VOTE_NOT_LEGAL"
+    },
+    "PROCESS_PATH_MISMATCH": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "weak",
+      "basis_hint": "流程路径异常可作为 weak reason_code"
+    },
+    "TRACE_MISSING_CONSTRUCTION_CONTRACT_TRACE": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "weak",
+      "deprecated_alias_of": "TRACE_MISSING_CONSTRUCTION_CONTRACT"
+    },
+    "TRACE_MISSING_APPRAISAL_CONTRACT_TRACE": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "weak",
+      "deprecated_alias_of": "TRACE_MISSING_APPRAISAL_CONTRACT"
+    },
+    "TRACE_MISSING_APPRAISAL_REPORT_TRACE": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "weak",
+      "deprecated_alias_of": "TRACE_MISSING_APPRAISAL_REPORT"
+    },
+    "TRACE_MISSING_ACCEPTANCE_TRACE": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "weak",
+      "basis_hint": "验收痕迹暂未正式实现"
+    },
+    "AMOUNT_INFO_PRESENT": {
+      "reserved": true,
+      "current_four_layer_used": false,
+      "basis_strength": "none",
+      "deprecated_alias_of": "AMOUNT_BUDGET_DISPLAY/AMOUNT_CONTRACT_DISPLAY"
+    }
+  },
+  "legacy_deprecated_entries": {
+    "IN_SCOPE_COMMON_PART": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "ENTITY_PUBLIC_REPAIR_OBJECT" },
+    "IN_SCOPE_COMMON_FACILITY": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "ENTITY_PUBLIC_REPAIR_OBJECT" },
+    "OUTSIDE_SCOPE_PRIVATE_PART": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "ENTITY_PRIVATE_PART_NOT_ELIGIBLE" },
+    "PROPERTY_SERVICE_SCOPE": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "ENTITY_PROPERTY_SERVICE_SCOPE" },
+    "GREENING_MAINTENANCE": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "ENTITY_PROPERTY_SERVICE_SCOPE" },
+    "CLEANING_SANITATION": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "ENTITY_PROPERTY_SERVICE_SCOPE" },
+    "INSPECTION_TESTING": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "ENTITY_PROPERTY_SERVICE_SCOPE" },
+    "MISSING_VOTE": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "TRACE_MISSING_VOTE_TRACE" },
+    "MISSING_CONTRACT": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "TRACE_MISSING_CONSTRUCTION_CONTRACT" },
+    "MISSING_BUDGET_REVIEW": { "deprecated": true, "current_four_layer_used": false },
+    "MISSING_ANNOUNCEMENT": { "deprecated": true, "current_four_layer_used": false },
+    "MISSING_COMPLETION_REPORT": { "deprecated": true, "current_four_layer_used": false },
+    "MISSING_EMERGENCY_DOC": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "PROCESS_EMERGENCY_TRACE_REVIEW_REQUIRED" },
+    "MISSING_AMOUNT": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "AMOUNT_INFO_MISSING" },
+    "MISSING_BUDGET_AMOUNT": { "deprecated": true, "current_four_layer_used": false, "deprecated_alias_of": "AMOUNT_INFO_MISSING" },
+    "MISSING_APPROVED_AMOUNT": { "deprecated": true, "current_four_layer_used": false },
+    "MISSING_AMOUNT_BASIS": { "deprecated": true, "current_four_layer_used": false },
+    "EMERGENCY_ELEVATOR_HAZARD": { "deprecated": true, "current_four_layer_used": false }
+  }
+}

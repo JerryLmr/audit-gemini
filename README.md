@@ -1,20 +1,35 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Audit Gemini Demo
 
-# Run and deploy your AI Studio app
+一个轻量化全栈 Demo：
+- 前端：`frontend/`（React + Vite）
+- 后端：`backend/`（FastAPI）
+- 无 conda、无数据库、无权限系统、无 RAG
 
-This contains everything you need to run your app locally.
+支持多文件上传；本期仅 Excel 参与审计，PDF 作为附件展示。
 
-View your app in AI Studio: https://ai.studio/apps/4dd99f37-e48e-476c-b43d-671279eb5e82
+## 启动方式
 
-## Run Locally
+### 启动后端
 
-**Prerequisites:**  Node.js
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
+### 启动前端
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Demo 流程
+
+1. 打开前端页面（默认 `http://localhost:3000`）。
+2. 上传 Excel（可混合上传 PDF）。
+3. 点击“开始审计”。
+4. 查看总体结论、分项卡片、问题卡片、证据区和审计人员视图。
