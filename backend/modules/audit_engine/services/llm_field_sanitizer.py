@@ -5,28 +5,44 @@ import re
 from typing import Any, Dict, List, Tuple
 
 
-def parse_llm_json(raw_content: Any) -> Dict[str, Any]:
+def _preview(value: Any, *, limit: int = 800) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return text[:limit]
+
+
+def parse_llm_json_with_meta(raw_content: Any) -> Tuple[Dict[str, Any], bool]:
     if isinstance(raw_content, dict):
-        return raw_content
+        return raw_content, True
     text = str(raw_content or "").strip()
     if not text:
-        return {}
+        return {}, False
     fenced = re.search(r"```(?:json)?\s*(.*?)```", text, flags=re.S | re.I)
     if fenced:
         text = fenced.group(1).strip()
     try:
         parsed = json.loads(text)
-        return parsed if isinstance(parsed, dict) else {}
+        if isinstance(parsed, dict):
+            return parsed, True
+        return {}, False
     except json.JSONDecodeError:
         start = text.find("{")
         end = text.rfind("}")
         if start >= 0 and end > start:
             try:
                 parsed = json.loads(text[start : end + 1])
-                return parsed if isinstance(parsed, dict) else {}
+                if isinstance(parsed, dict):
+                    return parsed, True
+                return {}, False
             except json.JSONDecodeError:
-                return {}
-    return {}
+                return {}, False
+    return {}, False
+
+
+def parse_llm_json(raw_content: Any) -> Dict[str, Any]:
+    parsed, _ = parse_llm_json_with_meta(raw_content)
+    return parsed
 
 
 def _allows_null(type_name: str) -> bool:
@@ -85,7 +101,7 @@ def _coerce_value(value: Any, definition: Dict[str, Any]) -> Tuple[Any, str | No
 
 
 def sanitize_llm_output(raw_output: Any, field_definitions: Dict[str, Any]) -> Dict[str, Any]:
-    parsed = parse_llm_json(raw_output)
+    parsed, json_parse_ok = parse_llm_json_with_meta(raw_output)
     incoming_fields = parsed.get("fields", parsed)
     if not isinstance(incoming_fields, dict):
         incoming_fields = {}
@@ -134,4 +150,7 @@ def sanitize_llm_output(raw_output: Any, field_definitions: Dict[str, Any]) -> D
         "uncertainties": [str(item).strip() for item in uncertainties if str(item).strip()],
         "validation_errors": validation_errors,
         "dropped_fields": dropped_fields,
+        "json_parse_ok": json_parse_ok,
+        "parsed_json_preview": _preview(json.dumps(parsed, ensure_ascii=False)),
+        "raw_content_preview": _preview(raw_output),
     }

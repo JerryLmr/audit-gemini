@@ -426,6 +426,7 @@ export default function App() {
                                 <div key={item.label} className="bg-white/[0.03] border border-white/5 rounded-xl p-3">
                                   <p className="text-[10px] text-slate-400">{item.label}</p>
                                   <p className={cn("text-sm font-medium mt-1", matrixRiskClass(item.risk))}>{item.value}</p>
+                                  {item.source && <p className="text-[10px] text-slate-500 mt-1">来源：{item.source}</p>}
                                 </div>
                               ))}
                             </div>
@@ -517,6 +518,12 @@ export default function App() {
                                   {item.field_label}：parser={item.parser_value} / llm={item.llm_value} / final={item.final_value}
                                 </p>
                               ))}
+                            </div>
+                            <div>
+                              <h4 className="text-slate-300 mb-2 font-semibold">llm_diagnostics</h4>
+                              <pre className="text-slate-400 whitespace-pre-wrap break-words bg-white/[0.03] border border-white/10 rounded-xl p-3">
+                                {JSON.stringify(report.auditorView.llmDiagnostics || {}, null, 2)}
+                              </pre>
                             </div>
                           </div>
                         )}
@@ -635,4 +642,3 @@ export default function App() {
     </div>
   );
 }
-

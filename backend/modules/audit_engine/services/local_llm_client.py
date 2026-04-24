@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import requests
 from requests import Response
 
-from app.config import LOCAL_LLM_API_KEY, LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL
+from app.config import LOCAL_LLM_API_KEY, LOCAL_LLM_BASE_URL, LOCAL_LLM_MODEL, LOCAL_LLM_TIMEOUT
 
 
 def _empty_failure(
@@ -17,18 +17,24 @@ def _empty_failure(
     requested_model: Optional[str] = None,
     selected_model: Optional[str] = None,
     warnings: Optional[List[str]] = None,
+    models_ok: bool = False,
+    chat_ok: bool = False,
+    timeout_seconds: Optional[int] = None,
 ) -> Dict[str, Any]:
     return {
         "available": False,
         "model": selected_model or requested_model or LOCAL_LLM_MODEL,
         "requested_model": requested_model or LOCAL_LLM_MODEL,
         "selected_model": selected_model,
-        "raw_content": "{}",
+        "raw_content": "",
         "error": error_message,
         "error_type": error_type,
         "error_message": error_message,
         "warnings": warnings or [],
         "models_response": models_response or {},
+        "models_ok": models_ok,
+        "chat_ok": chat_ok,
+        "timeout_seconds": timeout_seconds if timeout_seconds is not None else LOCAL_LLM_TIMEOUT,
     }
 
 
@@ -93,6 +99,8 @@ def check_local_llm_models(*, timeout: int = 5) -> Dict[str, Any]:
                 f"/models returned HTTP {response.status_code}: {response.text[:500]}",
                 models_response,
                 requested_model=LOCAL_LLM_MODEL,
+                models_ok=False,
+                chat_ok=False,
             )
         if not isinstance(models_response, dict) or not isinstance(models_response.get("data"), list):
             return _empty_failure(
@@ -100,6 +108,8 @@ def check_local_llm_models(*, timeout: int = 5) -> Dict[str, Any]:
                 "/models response missing data list",
                 models_response,
                 requested_model=LOCAL_LLM_MODEL,
+                models_ok=False,
+                chat_ok=False,
             )
         model_ids = [
             item.get("id")
@@ -112,6 +122,8 @@ def check_local_llm_models(*, timeout: int = 5) -> Dict[str, Any]:
                 "/models response has empty model id list",
                 models_response,
                 requested_model=LOCAL_LLM_MODEL,
+                models_ok=False,
+                chat_ok=False,
             )
         selected_model, selection_warning = _pick_model(model_ids, LOCAL_LLM_MODEL)
         warnings: List[str] = []
@@ -128,6 +140,8 @@ def check_local_llm_models(*, timeout: int = 5) -> Dict[str, Any]:
             "error": None,
             "error_type": None,
             "error_message": None,
+            "models_ok": True,
+            "chat_ok": False,
         }
     except Exception as exc:
         error_type = _classify_request_error(exc)
@@ -146,16 +160,19 @@ def check_local_llm_models(*, timeout: int = 5) -> Dict[str, Any]:
             error_type,
             str(exc),
             requested_model=LOCAL_LLM_MODEL,
+            models_ok=False,
+            chat_ok=False,
         )
 
 
-def call_local_llm_json(prompt: str, *, timeout: int = 120) -> Dict[str, Any]:
+def call_local_llm_json(prompt: str, *, timeout: Optional[int] = None) -> Dict[str, Any]:
     """Call LM Studio's OpenAI-compatible chat completions endpoint.
 
     The audit pipeline must keep running when the local model is unavailable.
     This function therefore returns an availability marker instead of raising
     network or response-shape exceptions.
     """
+    request_timeout = timeout if timeout is not None else LOCAL_LLM_TIMEOUT
     models_check = check_local_llm_models()
     if models_check.get("available") is not True:
         return models_check
@@ -180,7 +197,7 @@ def call_local_llm_json(prompt: str, *, timeout: int = 120) -> Dict[str, Any]:
     }
 
     try:
-        response = requests.post(url, json=payload, headers=headers, timeout=timeout)
+        response = requests.post(url, json=payload, headers=headers, timeout=request_timeout)
         data = _response_json(response)
         if not response.ok:
             warnings = list(models_check.get("warnings") or [])
@@ -192,6 +209,9 @@ def call_local_llm_json(prompt: str, *, timeout: int = 120) -> Dict[str, Any]:
                 requested_model=models_check.get("requested_model"),
                 selected_model=selected_model,
                 warnings=warnings,
+                models_ok=True,
+                chat_ok=False,
+                timeout_seconds=request_timeout,
             )
         if data is None:
             warnings = list(models_check.get("warnings") or [])
@@ -203,6 +223,9 @@ def call_local_llm_json(prompt: str, *, timeout: int = 120) -> Dict[str, Any]:
                 requested_model=models_check.get("requested_model"),
                 selected_model=selected_model,
                 warnings=warnings,
+                models_ok=True,
+                chat_ok=False,
+                timeout_seconds=request_timeout,
             )
         content: Optional[str] = (
             data.get("choices", [{}])[0]
@@ -219,6 +242,9 @@ def call_local_llm_json(prompt: str, *, timeout: int = 120) -> Dict[str, Any]:
                 requested_model=models_check.get("requested_model"),
                 selected_model=selected_model,
                 warnings=warnings,
+                models_ok=True,
+                chat_ok=False,
+                timeout_seconds=request_timeout,
             )
         return {
             "available": True,
@@ -232,6 +258,9 @@ def call_local_llm_json(prompt: str, *, timeout: int = 120) -> Dict[str, Any]:
             "error_type": None,
             "error_message": None,
             "models_response": models_check.get("models_response") or {},
+            "models_ok": True,
+            "chat_ok": True,
+            "timeout_seconds": request_timeout,
         }
     except Exception as exc:
         warnings = list(models_check.get("warnings") or [])
@@ -243,4 +272,7 @@ def call_local_llm_json(prompt: str, *, timeout: int = 120) -> Dict[str, Any]:
             requested_model=models_check.get("requested_model"),
             selected_model=selected_model,
             warnings=warnings,
+            models_ok=True,
+            chat_ok=False,
+            timeout_seconds=request_timeout,
         )

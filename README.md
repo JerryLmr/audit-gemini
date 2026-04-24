@@ -23,14 +23,16 @@ uvicorn app.main:app --reload --port 8000
 
 ```env
 LOCAL_LLM_BASE_URL=http://172.18.0.1:1234/v1
-LOCAL_LLM_MODEL=auto
+LOCAL_LLM_MODEL=qwen/qwen3.6-35b-a3b
 LOCAL_LLM_API_KEY=lm-studio
+LOCAL_LLM_TIMEOUT=300
 ```
 
 说明：
 - Windows + WSL 场景通常使用 Windows 主机 IP（例如 `172.18.0.1`）。
 - LM Studio 需要开启 **Serve on local network**。
 - `LOCAL_LLM_MODEL=auto` 时会自动选择 `/models` 返回的第一个模型。
+- 大模型首包慢时可先提高 `LOCAL_LLM_TIMEOUT`，并在审计人员视图查看 `llm_diagnostics.chat_ok / error_type` 定位超时原因。
 
 ### 启动前端
 

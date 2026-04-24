@@ -30,7 +30,9 @@ const FIELD_LABELS: Record<string, string> = {
   construction_start_date: "施工开始日期",
   construction_finish_date: "施工完成日期",
   contract_sign_date: "合同签订日期",
-  vote_date_is_proxy: "表决日期代理值",
+  need_cost_review: "是否需要审价",
+  repair_nature: "维修资金性质/项目属性",
+  property_raw_value: "维修资金性质原始值",
 };
 
 const SECTION_META: Array<{ key: string; title: string }> = [
@@ -50,6 +52,19 @@ const ISSUE_TITLE_MAP: Array<{ match: RegExp; title: string }> = [
   { match: /llm|AI 字段归类/i, title: "AI字段归类未启用" },
 ];
 
+type RuntimeCandidate = {
+  source_sheet?: string;
+  source_column?: string;
+  raw_value?: unknown;
+  normalized_value?: unknown;
+};
+
+type RuntimeField = {
+  value?: unknown;
+  candidates?: RuntimeCandidate[];
+};
+type MaterialStatus = "已提取" | "缺项" | "未识别" | "需复核";
+
 function getRiskLevel(result: string): string {
   if (result === "non_compliant") return "高";
   if (result === "need_supplement" || result === "manual_review") return "中";
@@ -63,6 +78,8 @@ function normalizeValue(value: unknown): string {
   if (value === "in_warranty") return "保修期内";
   if (value === "out_of_warranty") return "已过保";
   if (value === "unknown") return "未识别";
+  if (value === "normal") return "普通维修";
+  if (value === "emergency") return "应急维修";
   return String(value);
 }
 
@@ -73,16 +90,89 @@ function runtimeValue(runtime: unknown): unknown {
   return runtime;
 }
 
+function asBoolean(value: unknown): boolean | null {
+  if (value === true || value === false) return value;
+  if (value === null || value === undefined || value === "") return null;
+  const text = String(value).trim().toLowerCase();
+  if (["1", "true", "yes", "y", "是", "有"].includes(text)) return true;
+  if (["0", "false", "no", "n", "否", "无"].includes(text)) return false;
+  return null;
+}
+
+function getFinalField(result: BackendAnalyzeResponse, key: string): RuntimeField | null {
+  const field = (result.final_fields || {})[key];
+  if (!field || typeof field !== "object") return null;
+  return field as RuntimeField;
+}
+
 function getField(result: BackendAnalyzeResponse, keys: string[]): unknown {
-  const finalFields = (result.final_fields || {}) as Record<string, unknown>;
   const rawFields = (result.raw_fields || {}) as Record<string, unknown>;
   for (const key of keys) {
-    const finalValue = runtimeValue(finalFields[key]);
+    const finalValue = runtimeValue((result.final_fields || {})[key]);
     if (finalValue !== undefined && finalValue !== null && finalValue !== "") return finalValue;
     const rawValue = rawFields[key];
     if (rawValue !== undefined && rawValue !== null && rawValue !== "") return rawValue;
   }
   return null;
+}
+
+function findCandidateValue(
+  result: BackendAnalyzeResponse,
+  fieldKey: string,
+  matcher: (candidate: RuntimeCandidate) => boolean
+): { value: unknown; source: string } | null {
+  const runtime = getFinalField(result, fieldKey);
+  const candidates = runtime?.candidates || [];
+  for (const candidate of candidates) {
+    if (!matcher(candidate)) continue;
+    const candidateValue = candidate.normalized_value ?? candidate.raw_value;
+    if (candidateValue === null || candidateValue === undefined || candidateValue === "") continue;
+    const source = [candidate.source_sheet, candidate.source_column].filter(Boolean).join(".");
+    return { value: candidateValue, source };
+  }
+  return null;
+}
+
+function getTimelineValue(
+  result: BackendAnalyzeResponse,
+  fallbackKeys: string[],
+  candidateQuery?: { field: string; matcher: (candidate: RuntimeCandidate) => boolean }
+): { value: string; source: string; rawDate: unknown } {
+  if (candidateQuery) {
+    const matched = findCandidateValue(result, candidateQuery.field, candidateQuery.matcher);
+    if (matched) {
+      return {
+        value: normalizeValue(matched.value),
+        source: matched.source || "候选字段",
+        rawDate: matched.value,
+      };
+    }
+  }
+  for (const key of fallbackKeys) {
+    const runtime = getFinalField(result, key);
+    const finalValue = runtimeValue(runtime);
+    if (finalValue !== null && finalValue !== undefined && finalValue !== "") {
+      return { value: normalizeValue(finalValue), source: `final_fields.${key}`, rawDate: finalValue };
+    }
+    const rawValue = (result.raw_fields || {})[key];
+    if (rawValue !== null && rawValue !== undefined && rawValue !== "") {
+      return { value: normalizeValue(rawValue), source: `raw_fields.${key}`, rawDate: rawValue };
+    }
+  }
+  return { value: "未识别", source: "未识别", rawDate: null };
+}
+
+function asDateValue(value: unknown): number | null {
+  if (!value) return null;
+  const time = new Date(String(value)).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
+function formatCurrency(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "未识别";
+  const num = typeof value === "number" ? value : Number(String(value).replace(/,/g, ""));
+  if (Number.isNaN(num)) return "未识别";
+  return new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 2 }).format(num);
 }
 
 function formatLawText(rawTitle: string, rawArticle: string): string {
@@ -117,7 +207,7 @@ function pickOverallResult(result: BackendAnalyzeResponse): string {
 function buildSummary(result: BackendAnalyzeResponse): string {
   if (result.message) return result.message;
   const overall = pickOverallResult(result);
-  return `总体结论：${overall}。请结合问题卡片与证据矩阵进行复核。`;
+  return `总体结论：${overall}。请结合问题卡片与关键审计证据提取矩阵进行复核。`;
 }
 
 function buildSections(result: BackendAnalyzeResponse): ViewSection[] {
@@ -163,7 +253,7 @@ function deriveSuggestion(reasonCode: string, missingItems: string[], descriptio
     return "请拆分维修对象边界，补充立项范围说明与对应材料。";
   }
   if (/llm/i.test(source)) {
-    return "请确认 LM Studio 已启动并加载模型，或继续使用规则审计结果。";
+    return "请确认 LM Studio 服务与模型加载状态，或继续使用规则审计结果。";
   }
   if (missingItems.length) {
     const mapped = missingItems.map((item) => FIELD_LABELS[item] || item);
@@ -176,7 +266,7 @@ function decorateDescription(reasonCode: string, description: string): string {
   if (/WARRANTY|保修期/i.test(reasonCode + description)) {
     return (
       description +
-      " 专项维修资金原则上用于物业保修期满后的共用部位、共用设施设备维修和更新改造。当前建议补充保修期相关材料后人工复核。"
+      " 专项维修资金原则上用于物业保修期满后的共用部位、共用设施设备维修和更新改造。当前材料缺少保修期依据或保修状态无法判断，建议补充后人工复核。"
     );
   }
   return description;
@@ -247,84 +337,198 @@ function mapRawFields(result: BackendAnalyzeResponse): Array<{ label: string; va
   }));
 }
 
-function asDateValue(value: unknown): number | null {
-  if (!value) return null;
-  const time = new Date(String(value)).getTime();
-  return Number.isNaN(time) ? null : time;
+function getSheetSet(result: BackendAnalyzeResponse): Set<string> {
+  const sourceSheets = Array.isArray(result.source_sheets) ? result.source_sheets : [];
+  return new Set(sourceSheets.map((item) => String(item || "").trim()));
 }
 
-function formatCurrency(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "未识别";
-  const num = typeof value === "number" ? value : Number(String(value).replace(/,/g, ""));
-  if (Number.isNaN(num)) return "未识别";
-  return new Intl.NumberFormat("zh-CN", { style: "currency", currency: "CNY", maximumFractionDigits: 2 }).format(num);
+function hasSheet(sheetSet: Set<string>, names: string[]): boolean {
+  return names.some((name) => sheetSet.has(name));
 }
 
 function buildMatrix(result: BackendAnalyzeResponse, conflicts: BackendFieldConflict[]) {
-  const voteDate = getField(result, ["vote_date"]);
-  const startDate = getField(result, ["construction_start_date"]);
-  const voteTime = asDateValue(voteDate);
-  const startTime = asDateValue(startDate);
+  const sheetSet = getSheetSet(result);
   const conflictFields = new Set(conflicts.map((item) => item.field));
 
-  const timeline = [
-    { label: "表决/征询开始日期", value: normalizeValue(getField(result, ["request_start_date", "vote_start_date"])) },
-    { label: "表决/征询结束日期", value: normalizeValue(getField(result, ["request_end_date", "vote_date"])) },
-    { label: "维修预案/决案日期", value: normalizeValue(getField(result, ["repair_plan_date", "decision_date"])) },
-    { label: "施工开始日期", value: normalizeValue(startDate) },
-    { label: "施工完成日期", value: normalizeValue(getField(result, ["construction_finish_date"])) },
-    { label: "合同签订日期", value: normalizeValue(getField(result, ["contract_sign_date"])) },
-    { label: "报修/工单创建日期", value: normalizeValue(getField(result, ["work_order_create_date", "report_date"])) },
-  ].map((item) => ({ ...item, risk: "none" as "none" | "medium" | "high" }));
+  const requestStart = getTimelineValue(result, [], {
+    field: "vote_date",
+    matcher: (c) => /REQUEST_STARTDATE|开始/.test(String(c.source_column || "")),
+  });
+  const requestEnd = getTimelineValue(result, ["vote_date"], {
+    field: "vote_date",
+    matcher: (c) => /REQUEST_ENDDATE|结束/.test(String(c.source_column || "")),
+  });
+  const planDate = getTimelineValue(result, ["vote_date"], {
+    field: "vote_date",
+    matcher: (c) => /REG_DATE|决议生成/.test(String(c.source_column || "")),
+  });
+  const startDate = getTimelineValue(result, ["construction_start_date"], {
+    field: "construction_start_date",
+    matcher: () => true,
+  });
+  const finishDate = getTimelineValue(result, ["construction_finish_date"], {
+    field: "construction_finish_date",
+    matcher: () => true,
+  });
+  const contractSignDate = getTimelineValue(result, ["contract_sign_date"], {
+    field: "contract_sign_date",
+    matcher: () => true,
+  });
 
-  if (voteTime && startTime && startTime < voteTime) {
-    timeline[3].risk = "high";
+  const workOrderTimelineValue = hasSheet(sheetSet, ["维修工单"]) ? "已提取（详见维修工单）" : "未识别";
+  const timeline = [
+    { label: "表决/征询开始日期", value: requestStart.value, source: requestStart.source, risk: "none" as "none" | "medium" | "high" },
+    { label: "表决/征询结束日期", value: requestEnd.value, source: requestEnd.source, risk: "none" as "none" | "medium" | "high" },
+    { label: "维修预案/决案日期", value: planDate.value, source: planDate.source, risk: "none" as "none" | "medium" | "high" },
+    { label: "施工开始日期", value: startDate.value, source: startDate.source, risk: "none" as "none" | "medium" | "high" },
+    { label: "施工完成日期", value: finishDate.value, source: finishDate.source, risk: "none" as "none" | "medium" | "high" },
+    { label: "合同签订日期", value: contractSignDate.value, source: contractSignDate.source, risk: "none" as "none" | "medium" | "high" },
+    { label: "报修/工单创建日期", value: workOrderTimelineValue, source: hasSheet(sheetSet, ["维修工单"]) ? "source_sheets.维修工单" : "未识别", risk: "none" as "none" | "medium" | "high" },
+  ];
+
+  const startTime = asDateValue(requestStart.rawDate);
+  const endTime = asDateValue(requestEnd.rawDate);
+  const constructionStartTime = asDateValue(startDate.rawDate);
+  if (startTime && endTime && startTime > endTime) {
+    timeline[0].risk = "high";
     timeline[1].risk = "high";
-  } else if (getField(result, ["vote_date_is_proxy"]) === true) {
+  }
+  if (endTime && constructionStartTime && constructionStartTime < endTime) {
+    timeline[1].risk = "high";
+    timeline[3].risk = "high";
+  }
+  if (getField(result, ["vote_date_is_proxy"]) === true && timeline[1].risk !== "high") {
     timeline[1].risk = "medium";
   }
 
-  const materialStatus = (fieldKeys: string[]): "已提取" | "缺项" | "未识别" | "需复核" => {
-    const field = fieldKeys[0];
-    if (field && conflictFields.has(field)) return "需复核";
-    const val = getField(result, fieldKeys);
-    if (val === true) return "已提取";
-    if (val === false) return "缺项";
-    if (val === null || val === undefined || val === "") return "未识别";
-    return "需复核";
-  };
+  const needConstructionContract = asBoolean(getField(result, ["need_construction_contract"]));
+  const hasConstructionContract = asBoolean(getField(result, ["has_construction_contract"]));
+  const needCostReview = asBoolean(getField(result, ["need_cost_review"]));
+  const hasAppraisalContract = asBoolean(getField(result, ["has_appraisal_contract"]));
+  const hasAppraisalReport = asBoolean(getField(result, ["has_appraisal_report"]));
+  const hasFinalAmount = getField(result, ["final_amount"]) !== null;
 
-  const materials = [
-    { label: "维修工单", status: materialStatus(["has_work_order"]) },
-    { label: "维修预案", status: materialStatus(["has_repair_plan"]) },
-    { label: "业主征询意见/表决汇总", status: materialStatus(["has_vote_trace"]) },
-    { label: "业主大会决议", status: materialStatus(["has_owner_resolution"]) },
-    { label: "施工合同", status: materialStatus(["has_construction_contract"]) },
-    { label: "审价合同", status: materialStatus(["has_appraisal_contract"]) },
-    { label: "审价报告", status: materialStatus(["has_appraisal_report"]) },
-    { label: "验收报告/完工报告", status: materialStatus(["has_acceptance_report"]) },
+  const materials: Array<{ label: string; status: MaterialStatus }> = [
+    {
+      label: "维修工单",
+      status: conflictFields.has("has_work_order")
+        ? "需复核"
+        : hasSheet(sheetSet, ["维修工单"])
+          ? "已提取"
+          : "未识别",
+    },
+    {
+      label: "维修预案",
+      status: hasSheet(sheetSet, ["维修预案", "维修决案"]) ? "已提取" : "未识别",
+    },
+    {
+      label: "业主征询意见/表决汇总",
+      status:
+        hasSheet(sheetSet, ["业主征询意见", "业主表决汇总"]) || asBoolean(getField(result, ["has_vote_trace"])) === true
+          ? "已提取"
+          : asBoolean(getField(result, ["has_vote_trace"])) === false
+            ? "缺项"
+            : "未识别",
+    },
+    {
+      label: "业主大会决议",
+      status: hasSheet(sheetSet, ["业主大会决议"]) ? "已提取" : "未识别",
+    },
+    {
+      label: "施工合同",
+      status:
+        hasConstructionContract === true || hasSheet(sheetSet, ["施工合同表"])
+          ? "已提取"
+          : needConstructionContract === true || hasConstructionContract === false
+            ? "缺项"
+            : "未识别",
+    },
+    {
+      label: "审价合同",
+      status:
+        hasAppraisalContract === true
+          ? "已提取"
+          : needCostReview === true || hasAppraisalContract === false
+            ? "缺项"
+            : "未识别",
+    },
+    {
+      label: "审价报告",
+      status:
+        hasAppraisalReport === true
+          ? "已提取"
+          : needCostReview === true || hasAppraisalReport === false
+            ? "缺项"
+            : "未识别",
+    },
+    {
+      label: "验收报告/完工报告",
+      status:
+        hasSheet(sheetSet, ["项目完工报告表", "验收报告", "完工报告"])
+          ? "已提取"
+          : needConstructionContract === true || hasFinalAmount
+            ? "缺项"
+            : "未识别",
+    },
   ];
 
+  const applicant = getField(result, ["applicant_name", "applicants", "owner_name", "declarer"]);
   const finance = [
     { label: "预算金额", value: formatCurrency(getField(result, ["budget_amount"])), note: "仅展示" },
     { label: "合同金额", value: formatCurrency(getField(result, ["contract_amount"])), note: "仅展示" },
     { label: "决算/最终金额", value: formatCurrency(getField(result, ["final_amount"])), note: "仅展示" },
-    { label: "是否需要审价", value: normalizeValue(getField(result, ["need_appraisal", "has_appraisal_contract"])) },
+    { label: "是否需要审价", value: normalizeValue(getField(result, ["need_cost_review"])) },
     { label: "维修资金性质/项目属性", value: normalizeValue(getField(result, ["repair_nature", "property_raw_value"])) },
-    { label: "申报主体/相关人员", value: normalizeValue(getField(result, ["applicant_name", "applicants", "owner_name"])) },
+    {
+      label: "申报主体/相关人员",
+      value: applicant === null || applicant === undefined || applicant === "" ? "暂无结构化字段，详见原始材料" : normalizeValue(applicant),
+    },
   ];
 
   return { timeline, materials, finance };
 }
 
-function llmDisplay(result: BackendAnalyzeResponse): { llmStatus: string; llmModel: string } {
+function llmDisplay(result: BackendAnalyzeResponse): {
+  llmStatus: string;
+  llmModel: string;
+  llmDiagnostics: Record<string, unknown>;
+} {
   const llm = (result.llm_result || {}) as Record<string, unknown>;
-  const selected = String(llm.selected_model || llm.model || "").trim();
+  const diagnostics = ((llm.llm_diagnostics as Record<string, unknown>) || {}) as Record<string, unknown>;
+  const selected = String(diagnostics.selected_model || llm.selected_model || llm.model || "").trim();
+
   const available = llm.available === true;
-  if (available) {
-    return { llmStatus: "可用", llmModel: selected || "未识别模型" };
+  const modelsOk = "models_ok" in diagnostics ? diagnostics.models_ok === true : available;
+  const chatOk = "chat_ok" in diagnostics ? diagnostics.chat_ok === true : available;
+  const jsonParseOk = "json_parse_ok" in diagnostics ? diagnostics.json_parse_ok === true : true;
+  const fieldCount = Number("field_count" in diagnostics ? diagnostics.field_count : Object.keys((llm.fields as Record<string, unknown>) || {}).length);
+
+  if (!available || !modelsOk || !chatOk) {
+    return {
+      llmStatus: "未启用（规则审计继续）",
+      llmModel: selected || "不可用",
+      llmDiagnostics: diagnostics,
+    };
   }
-  return { llmStatus: "未启用（规则审计继续）", llmModel: selected || "不可用" };
+  if (!jsonParseOk) {
+    return {
+      llmStatus: "已响应，字段解析失败",
+      llmModel: selected || "未识别模型",
+      llmDiagnostics: diagnostics,
+    };
+  }
+  if (fieldCount <= 0) {
+    return {
+      llmStatus: "已响应，无有效字段",
+      llmModel: selected || "未识别模型",
+      llmDiagnostics: diagnostics,
+    };
+  }
+  return {
+    llmStatus: "可用",
+    llmModel: selected || "未识别模型",
+    llmDiagnostics: diagnostics,
+  };
 }
 
 export function mapBackendAuditToViewModel(result: BackendAnalyzeResponse): AuditViewModel {
@@ -350,6 +554,7 @@ export function mapBackendAuditToViewModel(result: BackendAnalyzeResponse): Audi
       reasonCodes: collectReasonCodes(result),
       rawFields: mapRawFields(result),
       conflicts,
+      llmDiagnostics: llmInfo.llmDiagnostics,
     },
   };
 }

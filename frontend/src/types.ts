@@ -30,6 +30,8 @@ export interface BackendAnalyzeResponse {
   status: string;
   message?: string;
   project_name?: string;
+  source_sheets?: string[];
+  business_summary?: string[];
   warnings?: string[];
   attachments?: BackendAttachment[];
   raw_fields?: Record<string, unknown>;
@@ -74,7 +76,7 @@ export interface AuditViewModel {
   issues: ViewIssue[];
   evidence: ViewEvidence[];
   matrix: {
-    timeline: Array<{ label: string; value: string; risk?: "none" | "medium" | "high" }>;
+    timeline: Array<{ label: string; value: string; source?: string; risk?: "none" | "medium" | "high" }>;
     materials: Array<{ label: string; status: "已提取" | "缺项" | "未识别" | "需复核" }>;
     finance: Array<{ label: string; value: string; note?: string }>;
   };
@@ -84,5 +86,6 @@ export interface AuditViewModel {
     reasonCodes: string[];
     rawFields: Array<{ label: string; value: string }>;
     conflicts: BackendFieldConflict[];
+    llmDiagnostics: Record<string, unknown>;
   };
 }

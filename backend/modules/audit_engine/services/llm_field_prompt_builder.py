@@ -26,9 +26,9 @@ def build_field_classification_prompt(
 ) -> str:
     schema = _llm_schema(field_definitions)
     contract = {
-        "fields": "对象；key 必须来自 schema，无法判断填 null",
-        "evidence": "对象；key 必须对应 fields 中已输出的字段，value 为原文短证据",
-        "uncertainties": "数组；只记录无法确定或需要人工复核的字段/原因",
+        "fields": {"示例字段key": "字段值或null"},
+        "evidence": {"示例字段key": "原文证据短句"},
+        "uncertainties": ["不确定项1", "不确定项2"],
     }
     return "\n".join(
         [
@@ -37,11 +37,14 @@ def build_field_classification_prompt(
             "1. 只能输出 schema 中定义的字段，不允许新增字段。",
             "2. 不能输出合规/不合规、审计结论、reason_code 或法规解释。",
             "3. 必须输出严格 JSON，不要 Markdown，不要解释性文字。",
-            "4. 无法判断的字段填 null。",
-            "5. 有 enum 的字段只能从 enum 中选择。",
-            "6. allow_inference=false 的字段必须来自原文明确事实，不能推断。",
-            "7. 不得把推断结果伪装成确定事实；不确定时写入 uncertainties。",
-            "输出 JSON 结构：",
+            '4. 输出必须是 JSON object，且必须包含且仅包含顶层键 "fields"、"evidence"、"uncertainties"。',
+            "5. fields 和 evidence 必须是对象；uncertainties 必须是数组。",
+            "6. 只要存在一个可确定字段，就必须写入 fields。",
+            "7. 无法判断的字段填 null。",
+            "8. 有 enum 的字段只能从 enum 中选择。",
+            "9. allow_inference=false 的字段必须来自原文明确事实，不能推断。",
+            "10. 不得把推断结果伪装成确定事实；不确定时写入 uncertainties。",
+            "输出 JSON 示例（仅示意结构）：",
             json.dumps(contract, ensure_ascii=False, indent=2),
             "schema：",
             json.dumps(schema, ensure_ascii=False, indent=2),
