@@ -33,6 +33,7 @@ export interface BackendAnalyzeResponse {
   warnings?: string[];
   attachments?: BackendAttachment[];
   raw_fields?: Record<string, unknown>;
+  final_fields?: Record<string, unknown>;
   llm_result?: Record<string, unknown>;
   field_conflicts?: BackendFieldConflict[];
   audit_result?: {
@@ -67,9 +68,16 @@ export interface AuditViewModel {
   summary: string;
   overallResult: string;
   riskLevel: string;
+  llmStatus: string;
+  llmModel: string;
   sections: ViewSection[];
   issues: ViewIssue[];
   evidence: ViewEvidence[];
+  matrix: {
+    timeline: Array<{ label: string; value: string; risk?: "none" | "medium" | "high" }>;
+    materials: Array<{ label: string; status: "已提取" | "缺项" | "未识别" | "需复核" }>;
+    finance: Array<{ label: string; value: string; note?: string }>;
+  };
   attachments: BackendAttachment[];
   warnings: string[];
   auditorView: {

@@ -1,6 +1,6 @@
 {
   "name": "专项维修资金智能审计",
-  "description": "AI驱动的住宅专项维修资金审计工具，支持上传Excel和PDF文件，自动通过Gemini进行数据抽取、合规分析、流程核对及报告生成。",
+  "description": "专项维修资金审计演示工具，支持上传Excel和PDF文件，基于本地LLM辅助字段归类与规则引擎进行合规分析和结果展示。",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }

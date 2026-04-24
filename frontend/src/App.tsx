@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   BookOpen,
-  CheckCircle2,
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
@@ -13,6 +12,7 @@ import {
   LayoutDashboard,
   Loader2,
   Search,
+  Trash2,
   Upload,
   X,
 } from "lucide-react";
@@ -28,11 +28,24 @@ function cn(...inputs: ClassValue[]) {
 }
 
 type Tab = "audit" | "history" | "policy";
+type PolicyFileMeta = {
+  id: string;
+  name: string;
+  type: string;
+  status: "已上传";
+  uploadedAt: string;
+};
 
 function riskColor(level: string) {
   if (level === "高") return "rose";
   if (level === "中") return "amber";
   return "emerald";
+}
+
+function matrixRiskClass(risk?: "none" | "medium" | "high") {
+  if (risk === "high") return "text-rose-300";
+  if (risk === "medium") return "text-amber-300";
+  return "text-slate-300";
 }
 
 export default function App() {
@@ -47,6 +60,10 @@ export default function App() {
     const saved = localStorage.getItem("audit_history_v2");
     return saved ? (JSON.parse(saved) as AuditViewModel[]) : [];
   });
+  const [policyFiles, setPolicyFiles] = useState<PolicyFileMeta[]>(() => {
+    const saved = localStorage.getItem("policy_files_demo_v1");
+    return saved ? (JSON.parse(saved) as PolicyFileMeta[]) : [];
+  });
 
   const canStart = useMemo(() => files.length > 0 && !isAuditing, [files.length, isAuditing]);
 
@@ -56,14 +73,38 @@ export default function App() {
     localStorage.setItem("audit_history_v2", JSON.stringify(updated));
   }
 
+  function updatePolicyFiles(next: PolicyFileMeta[]) {
+    setPolicyFiles(next);
+    localStorage.setItem("policy_files_demo_v1", JSON.stringify(next));
+  }
+
   function handleFileUpload(e: ChangeEvent<HTMLInputElement>) {
     if (!e.target.files) return;
     const picked = Array.from(e.target.files);
     setFiles((prev) => [...prev, ...picked]);
   }
 
+  function handlePolicyUpload(e: ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files) return;
+    const added = Array.from(e.target.files).map((file) => ({
+      id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: file.name,
+      type: file.type || "application/octet-stream",
+      status: "已上传" as const,
+      uploadedAt: new Date().toLocaleString(),
+    }));
+    updatePolicyFiles([...
+      added,
+      ...policyFiles,
+    ]);
+  }
+
   function removeFile(index: number) {
     setFiles((prev) => prev.filter((_, idx) => idx !== index));
+  }
+
+  function removePolicyFile(id: string) {
+    updatePolicyFiles(policyFiles.filter((item) => item.id !== id));
   }
 
   async function startAudit() {
@@ -145,7 +186,7 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 relative z-10">
         <AnimatePresence mode="wait">
           {activeTab === "audit" && (
             <motion.div
@@ -249,6 +290,12 @@ export default function App() {
                       </div>
                     ))}
                   </div>
+                  {report && (
+                    <div className="pt-2 border-t border-white/10 text-xs">
+                      <p className="text-slate-400">LLM 状态：{report.llmStatus}</p>
+                      <p className="text-slate-500 mt-1">模型：{report.llmModel}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -306,12 +353,6 @@ export default function App() {
                       </div>
                       <h3 className="text-xl font-bold text-rose-200">请求失败</h3>
                       <p className="text-rose-400/80 mt-3 max-w-xl mx-auto leading-relaxed text-sm">{error}</p>
-                      <button
-                        onClick={() => setError(null)}
-                        className="mt-8 px-10 py-3 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold transition-all shadow-lg shadow-rose-900/20"
-                      >
-                        重置并重试
-                      </button>
                     </motion.div>
                   )}
 
@@ -339,12 +380,7 @@ export default function App() {
                         <div className="absolute top-[-50px] right-[-50px] p-20 bg-indigo-500/5 rounded-full blur-[60px]" />
                         <h2 className="text-3xl font-extrabold text-white tracking-tight leading-tight">{report.projectName}</h2>
                         <p className="text-xs text-slate-500 mt-2 font-bold tracking-widest uppercase">审计结论：{report.overallResult}</p>
-
                         <div className="bg-slate-900/40 p-6 rounded-2xl border border-white/5 relative mt-6">
-                          <div className="flex items-center gap-2 mb-4 text-indigo-400">
-                            <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
-                            <span className="text-[10px] font-bold uppercase tracking-widest">综合摘要</span>
-                          </div>
                           <div className="text-slate-300 leading-relaxed text-sm font-medium markdown-body">
                             <ReactMarkdown>{report.summary}</ReactMarkdown>
                           </div>
@@ -367,6 +403,59 @@ export default function App() {
                         {report.issues.length === 0 && (
                           <div className="glass-card p-6 text-sm text-emerald-300 border border-emerald-500/30">当前未发现需要展示的问题卡片。</div>
                         )}
+                      </div>
+
+                      <div className="glass-card overflow-hidden shadow-2xl relative">
+                        <div className="p-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/5">
+                              <LayoutDashboard className="w-6 h-6 text-indigo-400" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-bold text-white tracking-tight">关键审计证据提取矩阵</h3>
+                              <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mt-1">Cross-Reference Data Extraction</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-12 bg-black/20">
+                          <div className="space-y-5">
+                            <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">逻辑时序追踪</h4>
+                            <div className="space-y-3">
+                              {report.matrix.timeline.map((item) => (
+                                <div key={item.label} className="bg-white/[0.03] border border-white/5 rounded-xl p-3">
+                                  <p className="text-[10px] text-slate-400">{item.label}</p>
+                                  <p className={cn("text-sm font-medium mt-1", matrixRiskClass(item.risk))}>{item.value}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-5">
+                            <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">材料扫描结果</h4>
+                            <div className="space-y-2">
+                              {report.matrix.materials.map((item) => (
+                                <div key={item.label} className="flex items-center justify-between bg-white/[0.03] p-3 rounded-xl border border-white/5">
+                                  <span className="text-xs text-slate-300">{item.label}</span>
+                                  <span className="text-[11px] text-slate-400">{item.status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="space-y-5">
+                            <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">财务要素萃取</h4>
+                            <div className="space-y-2">
+                              {report.matrix.finance.map((item) => (
+                                <div key={item.label} className="bg-white/[0.03] p-3 rounded-xl border border-white/5">
+                                  <p className="text-[10px] text-slate-400">{item.label}</p>
+                                  <p className="text-sm text-slate-200 mt-1">{item.value}</p>
+                                  {item.note && <p className="text-[10px] text-slate-500 mt-1">{item.note}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
                       <div className="glass-card overflow-hidden shadow-2xl relative">
@@ -486,23 +575,51 @@ export default function App() {
           {activeTab === "policy" && (
             <motion.div key="policy-view" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div className="glass-card p-8">
-                <div className="flex items-center gap-4 mb-8">
+                <div className="flex items-center gap-4 mb-6">
                   <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20">
                     <BookOpen className="w-6 h-6 text-indigo-400" />
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold text-white tracking-tight">维修资金政策库</h2>
-                    <p className="text-xs text-slate-500 font-bold tracking-widest uppercase mt-1">Maintenance Fund Policies</p>
+                    <p className="text-xs text-slate-500 font-bold tracking-widest uppercase mt-1">Policy Library (Demo)</p>
                   </div>
                 </div>
-                <p className="text-sm text-slate-400">本页保留为扩展区，当前演示主流程为“上传材料 {"->"} 审计结果展示”。</p>
+
+                <div className="text-sm text-slate-400 leading-relaxed space-y-1 mb-6">
+                  <p>当前政策库为演示版：支持本地开发上传并保存文件列表（localStorage）。</p>
+                  <p>现阶段审计依据主要来自规则引擎 reason_code 与内置法规绑定。</p>
+                  <p>后续可扩展为 RAG 检索、新法规上传与法规条款匹配。</p>
+                </div>
+
+                <label className="block border-2 border-dashed border-white/15 rounded-xl p-6 text-center cursor-pointer hover:border-indigo-500 transition-all">
+                  <input type="file" multiple accept=".pdf,.docx,.txt,.md" className="hidden" onChange={handlePolicyUpload} />
+                  <Upload className="w-6 h-6 text-indigo-400 mx-auto mb-2" />
+                  <p className="text-sm text-slate-300">上传政策文件（.pdf/.docx/.txt/.md）</p>
+                </label>
+
+                <div className="mt-6 space-y-2">
+                  {policyFiles.length === 0 && <p className="text-sm text-slate-500">暂无上传文件。</p>}
+                  {policyFiles.map((item) => (
+                    <div key={item.id} className="bg-white/[0.03] border border-white/10 rounded-xl p-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm text-slate-200 truncate">{item.name}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          类型：{item.type} | 状态：{item.status} | 时间：{item.uploadedAt}
+                        </p>
+                      </div>
+                      <button onClick={() => removePolicyFile(item.id)} className="p-2 text-rose-300 hover:bg-rose-500/10 rounded">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
-      <footer className="h-10 px-8 bg-white/5 flex items-center justify-between text-[10px] text-slate-500 border-t border-white/5 sticky bottom-0 backdrop-blur-sm z-50">
+      <footer className="fixed bottom-0 left-0 right-0 h-10 px-8 bg-slate-950/85 flex items-center justify-between text-[10px] text-slate-400 border-t border-white/10 backdrop-blur-sm z-50">
         <div className="flex gap-6 font-bold uppercase tracking-widest">
           <span className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full" />
@@ -511,10 +628,11 @@ export default function App() {
           <span>LLM Engine: Local Studio</span>
         </div>
         <div className="flex gap-6 font-bold uppercase tracking-widest">
-          <span>数据加密已启用</span>
+          <span>规则审计已启用</span>
           <span>最后同步: {new Date().toLocaleTimeString()}</span>
         </div>
       </footer>
     </div>
   );
 }
+

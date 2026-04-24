@@ -19,7 +19,6 @@ def load_local_env() -> None:
 
 load_local_env()
 
-LOCAL_LLM_BASE_URL = os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:1234/v1").rstrip("/")
+LOCAL_LLM_BASE_URL = os.getenv("LOCAL_LLM_BASE_URL", "http://172.18.0.1:1234/v1").rstrip("/")
 LOCAL_LLM_MODEL = os.getenv("LOCAL_LLM_MODEL", "qwen/qwen3.6-35b-a3b")
 LOCAL_LLM_API_KEY = os.getenv("LOCAL_LLM_API_KEY", "lm-studio")
-

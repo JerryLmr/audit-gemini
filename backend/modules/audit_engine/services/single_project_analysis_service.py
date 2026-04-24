@@ -333,6 +333,8 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
         "本地 LLM 字段归类仅作辅助，最终审计结论由规则引擎输出。"
     ]
 
+    llm_warnings = list(llm_result.get("warnings") or [])
+    warnings.extend(llm_warnings)
     if llm_result.get("available") is not True:
         warnings.append("本地 LLM 不可用，已跳过 AI 字段归类。")
     if field_conflicts:
@@ -356,4 +358,3 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
         "audit_result": audit_result,
         "warnings": warnings + list(row.get("warnings") or []),
     }
-

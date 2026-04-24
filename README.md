@@ -19,6 +19,19 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
+可选 `.env`（`backend/.env`）：
+
+```env
+LOCAL_LLM_BASE_URL=http://172.18.0.1:1234/v1
+LOCAL_LLM_MODEL=auto
+LOCAL_LLM_API_KEY=lm-studio
+```
+
+说明：
+- Windows + WSL 场景通常使用 Windows 主机 IP（例如 `172.18.0.1`）。
+- LM Studio 需要开启 **Serve on local network**。
+- `LOCAL_LLM_MODEL=auto` 时会自动选择 `/models` 返回的第一个模型。
+
 ### 启动前端
 
 ```bash

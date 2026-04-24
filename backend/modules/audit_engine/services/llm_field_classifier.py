@@ -17,14 +17,18 @@ def classify_fields_with_local_llm(raw_fields: Dict[str, Any], raw_text: str) ->
     )
     llm_response = call_local_llm_json(prompt)
     if llm_response.get("available") is not True:
+        warnings = list(llm_response.get("warnings") or [])
         return {
             "available": False,
             "model": llm_response.get("model"),
+            "requested_model": llm_response.get("requested_model"),
+            "selected_model": llm_response.get("selected_model"),
             "fields": {},
             "evidence": {},
             "uncertainties": [
                 f"本地 LLM 调用失败（{llm_response.get('error_type') or 'unknown'}），已跳过 AI 字段归类。"
             ],
+            "warnings": warnings,
             "validation_errors": [],
             "dropped_fields": [],
             "error": llm_response.get("error"),
@@ -37,6 +41,9 @@ def classify_fields_with_local_llm(raw_fields: Dict[str, Any], raw_text: str) ->
     return {
         "available": True,
         "model": llm_response.get("model"),
+        "requested_model": llm_response.get("requested_model"),
+        "selected_model": llm_response.get("selected_model"),
+        "warnings": list(llm_response.get("warnings") or []),
         **sanitized,
         "error": None,
         "error_type": None,
