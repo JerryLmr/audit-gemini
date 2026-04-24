@@ -346,6 +346,87 @@ function hasSheet(sheetSet: Set<string>, names: string[]): boolean {
   return names.some((name) => sheetSet.has(name));
 }
 
+function isRecognizedText(value: string): boolean {
+  return value !== "未识别" && value !== "未知" && value.trim() !== "";
+}
+
+function timelineNode(
+  dateText: string,
+  title: string,
+  recognizedDescription: string,
+  source: string,
+  risk: "none" | "medium" | "high" = "none"
+) {
+  return {
+    dateText,
+    title,
+    description: isRecognizedText(dateText) ? recognizedDescription : "暂未识别（建议人工复核）",
+    source: source || "未识别",
+    risk,
+  };
+}
+
+function materialExtractionResult(status: MaterialStatus): string {
+  if (status === "已提取") return "已识别到相关证据";
+  if (status === "缺项") return "未识别到对应材料";
+  if (status === "需复核") return "字段存在冲突或需人工核验";
+  return "暂未形成结构化识别结果";
+}
+
+function materialAuditImpact(label: string, status: MaterialStatus): string {
+  if (status === "已提取") return `${label}已形成证据链，可进入下一步合规核验。`;
+  if (status === "缺项") return `${label}缺失将影响流程完整性与合规判断结论。`;
+  if (status === "需复核") return `${label}存在冲突，可能影响字段可信度。`;
+  return `${label}尚未识别，当前仅能给出保守审计判断。`;
+}
+
+function materialRemediation(label: string, status: MaterialStatus): string | undefined {
+  if (status !== "缺项") return undefined;
+  if (label === "施工合同") return "建议补充施工合同或中标/委托文件。";
+  if (label === "验收报告/完工报告") return "建议补充完工验收材料。";
+  if (label === "业主大会决议") return "建议补充业主大会/业委会决议材料。";
+  return "建议补充对应材料并人工复核。";
+}
+
+function parseAmount(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const normalized = String(value).replace(/[,\s￥¥元]/g, "").trim();
+  if (!normalized) return null;
+  const num = Number(normalized);
+  return Number.isNaN(num) ? null : num;
+}
+
+function formatCompactAmount(value: unknown): string {
+  const num = parseAmount(value);
+  if (num === null) return "未识别";
+  if (Math.abs(num) >= 10000) return `${(num / 10000).toFixed(2)} 万元`;
+  return `${num.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 元`;
+}
+
+function resolveFieldWithSource(result: BackendAnalyzeResponse, keys: string[]): { value: unknown; source: string } {
+  const finalFields = (result.final_fields || {}) as Record<string, unknown>;
+  const rawFields = (result.raw_fields || {}) as Record<string, unknown>;
+  for (const key of keys) {
+    const finalField = finalFields[key];
+    const finalValue = runtimeValue(finalField);
+    if (finalValue !== undefined && finalValue !== null && finalValue !== "") {
+      return { value: finalValue, source: `final_fields.${key}` };
+    }
+    const rawValue = rawFields[key];
+    if (rawValue !== undefined && rawValue !== null && rawValue !== "") {
+      return { value: rawValue, source: `raw_fields.${key}` };
+    }
+  }
+  return { value: null, source: "未识别" };
+}
+
+function parseApplicantNames(value: unknown): string[] {
+  const text = normalizeValue(value);
+  if (!text || text === "未识别") return [];
+  return [...new Set(text.split(/[，、,;；/\s\n]+/).map((item) => item.trim()).filter(Boolean))];
+}
+
 function buildMatrix(result: BackendAnalyzeResponse, conflicts: BackendFieldConflict[]) {
   const sheetSet = getSheetSet(result);
   const conflictFields = new Set(conflicts.map((item) => item.field));
@@ -377,13 +458,18 @@ function buildMatrix(result: BackendAnalyzeResponse, conflicts: BackendFieldConf
 
   const workOrderTimelineValue = hasSheet(sheetSet, ["维修工单"]) ? "已提取（详见维修工单）" : "未识别";
   const timeline = [
-    { label: "表决/征询开始日期", value: requestStart.value, source: requestStart.source, risk: "none" as "none" | "medium" | "high" },
-    { label: "表决/征询结束日期", value: requestEnd.value, source: requestEnd.source, risk: "none" as "none" | "medium" | "high" },
-    { label: "维修预案/决案日期", value: planDate.value, source: planDate.source, risk: "none" as "none" | "medium" | "high" },
-    { label: "施工开始日期", value: startDate.value, source: startDate.source, risk: "none" as "none" | "medium" | "high" },
-    { label: "施工完成日期", value: finishDate.value, source: finishDate.source, risk: "none" as "none" | "medium" | "high" },
-    { label: "合同签订日期", value: contractSignDate.value, source: contractSignDate.source, risk: "none" as "none" | "medium" | "high" },
-    { label: "报修/工单创建日期", value: workOrderTimelineValue, source: hasSheet(sheetSet, ["维修工单"]) ? "source_sheets.维修工单" : "未识别", risk: "none" as "none" | "medium" | "high" },
+    timelineNode(requestStart.value, "表决/征询开始", "业主征询意见表开始发送。", requestStart.source),
+    timelineNode(requestEnd.value, "表决/征询结束", "业主征询意见表结束发送。", requestEnd.source),
+    timelineNode(planDate.value, "维修预案/决案形成", "维修预案及维修决案形成。", planDate.source),
+    timelineNode(startDate.value, "施工开始", "工程计划进入实施阶段。", startDate.source),
+    timelineNode(finishDate.value, "施工完成", "工程完工或验收节点形成。", finishDate.source),
+    timelineNode(contractSignDate.value, "合同签订", "施工合同签订完成。", contractSignDate.source),
+    timelineNode(
+      workOrderTimelineValue,
+      "工单创建/报修登记",
+      "维修工单批量创建并进入执行。",
+      hasSheet(sheetSet, ["维修工单"]) ? "source_sheets.维修工单" : "未识别"
+    ),
   ];
 
   const startTime = asDateValue(requestStart.rawDate);
@@ -408,18 +494,16 @@ function buildMatrix(result: BackendAnalyzeResponse, conflicts: BackendFieldConf
   const hasAppraisalReport = asBoolean(getField(result, ["has_appraisal_report"]));
   const hasFinalAmount = getField(result, ["final_amount"]) !== null;
 
-  const materials: Array<{ label: string; status: MaterialStatus }> = [
+  const materialRows: Array<{ label: string; status: MaterialStatus; source: string }> = [
     {
       label: "维修工单",
-      status: conflictFields.has("has_work_order")
-        ? "需复核"
-        : hasSheet(sheetSet, ["维修工单"])
-          ? "已提取"
-          : "未识别",
+      status: conflictFields.has("has_work_order") ? "需复核" : hasSheet(sheetSet, ["维修工单"]) ? "已提取" : "未识别",
+      source: hasSheet(sheetSet, ["维修工单"]) ? "source_sheets.维修工单" : "未识别",
     },
     {
       label: "维修预案",
       status: hasSheet(sheetSet, ["维修预案", "维修决案"]) ? "已提取" : "未识别",
+      source: hasSheet(sheetSet, ["维修预案", "维修决案"]) ? "source_sheets.维修预案/维修决案" : "未识别",
     },
     {
       label: "业主征询意见/表决汇总",
@@ -429,10 +513,16 @@ function buildMatrix(result: BackendAnalyzeResponse, conflicts: BackendFieldConf
           : asBoolean(getField(result, ["has_vote_trace"])) === false
             ? "缺项"
             : "未识别",
+      source: hasSheet(sheetSet, ["业主征询意见", "业主表决汇总"])
+        ? "source_sheets.业主征询意见/业主表决汇总"
+        : asBoolean(getField(result, ["has_vote_trace"])) !== null
+          ? "final_fields.has_vote_trace"
+          : "未识别",
     },
     {
       label: "业主大会决议",
-      status: hasSheet(sheetSet, ["业主大会决议"]) ? "已提取" : "未识别",
+      status: hasSheet(sheetSet, ["业主大会决议"]) ? "已提取" : "缺项",
+      source: hasSheet(sheetSet, ["业主大会决议"]) ? "source_sheets.业主大会决议" : "未识别",
     },
     {
       label: "施工合同",
@@ -442,50 +532,102 @@ function buildMatrix(result: BackendAnalyzeResponse, conflicts: BackendFieldConf
           : needConstructionContract === true || hasConstructionContract === false
             ? "缺项"
             : "未识别",
+      source:
+        hasSheet(sheetSet, ["施工合同表"])
+          ? "source_sheets.施工合同表"
+          : hasConstructionContract !== null
+            ? "final_fields.has_construction_contract"
+            : "未识别",
     },
     {
       label: "审价合同",
-      status:
-        hasAppraisalContract === true
-          ? "已提取"
-          : needCostReview === true || hasAppraisalContract === false
-            ? "缺项"
-            : "未识别",
+      status: hasAppraisalContract === true ? "已提取" : needCostReview === true || hasAppraisalContract === false ? "缺项" : "未识别",
+      source: hasAppraisalContract !== null ? "final_fields.has_appraisal_contract" : "未识别",
     },
     {
       label: "审价报告",
-      status:
-        hasAppraisalReport === true
-          ? "已提取"
-          : needCostReview === true || hasAppraisalReport === false
-            ? "缺项"
-            : "未识别",
+      status: hasAppraisalReport === true ? "已提取" : needCostReview === true || hasAppraisalReport === false ? "缺项" : "未识别",
+      source: hasAppraisalReport !== null ? "final_fields.has_appraisal_report" : "未识别",
     },
     {
       label: "验收报告/完工报告",
-      status:
-        hasSheet(sheetSet, ["项目完工报告表", "验收报告", "完工报告"])
-          ? "已提取"
-          : needConstructionContract === true || hasFinalAmount
-            ? "缺项"
-            : "未识别",
+      status: hasSheet(sheetSet, ["项目完工报告表", "验收报告", "完工报告"]) ? "已提取" : needConstructionContract === true || hasFinalAmount ? "缺项" : "未识别",
+      source: hasSheet(sheetSet, ["项目完工报告表", "验收报告", "完工报告"]) ? "source_sheets.项目完工报告表/验收报告/完工报告" : "未识别",
     },
   ];
 
-  const applicant = getField(result, ["applicant_name", "applicants", "owner_name", "declarer"]);
-  const finance = [
-    { label: "预算金额", value: formatCurrency(getField(result, ["budget_amount"])), note: "仅展示" },
-    { label: "合同金额", value: formatCurrency(getField(result, ["contract_amount"])), note: "仅展示" },
-    { label: "决算/最终金额", value: formatCurrency(getField(result, ["final_amount"])), note: "仅展示" },
-    { label: "是否需要审价", value: normalizeValue(getField(result, ["need_cost_review"])) },
-    { label: "维修资金性质/项目属性", value: normalizeValue(getField(result, ["repair_nature", "property_raw_value"])) },
+  const materials = materialRows.map((item) => ({
+    label: item.label,
+    status: item.status,
+    extractionResult: materialExtractionResult(item.status),
+    source: item.source || "未识别",
+    auditImpact: materialAuditImpact(item.label, item.status),
+    remediation: materialRemediation(item.label, item.status),
+  }));
+
+  const applicantResolved = resolveFieldWithSource(result, ["applicant_name", "applicants", "owner_name", "declarer"]);
+  const applicantNames = parseApplicantNames(applicantResolved.value);
+  const applicantSummary =
+    applicantNames.length > 2 ? `${applicantNames[0]} 等 ${applicantNames.length} 人` : applicantNames.length > 0 ? applicantNames.join("、") : "未识别";
+  const applicantFullText = applicantNames.length > 0 ? applicantNames.join("、") : "未识别";
+
+  const finalAmountResolved = resolveFieldWithSource(result, ["final_amount"]);
+  const budgetAmountResolved = resolveFieldWithSource(result, ["budget_amount"]);
+  const contractAmountResolved = resolveFieldWithSource(result, ["contract_amount"]);
+
+  const finalAmount = formatCurrency(finalAmountResolved.value);
+  const budgetAmount = formatCurrency(budgetAmountResolved.value);
+  const contractAmount = formatCurrency(contractAmountResolved.value);
+  const heroAmount =
+    finalAmount !== "未识别" ? finalAmount : budgetAmount !== "未识别" ? budgetAmount : contractAmount !== "未识别" ? contractAmount : "未识别";
+  const heroLabel =
+    finalAmount !== "未识别" ? "决算/最终金额" : budgetAmount !== "未识别" ? "预算金额" : contractAmount !== "未识别" ? "合同金额" : "决算/最终金额";
+  const heroValue =
+    finalAmount !== "未识别"
+      ? finalAmountResolved.value
+      : budgetAmount !== "未识别"
+        ? budgetAmountResolved.value
+        : contractAmount !== "未识别"
+          ? contractAmountResolved.value
+          : null;
+  const heroSource =
+    finalAmount !== "未识别"
+      ? finalAmountResolved.source
+      : budgetAmount !== "未识别"
+        ? budgetAmountResolved.source
+        : contractAmount !== "未识别"
+          ? contractAmountResolved.source
+          : "未识别";
+
+  const financeItems = [
+    { label: "预算金额", value: formatCurrency(budgetAmountResolved.value), source: budgetAmountResolved.source, note: "仅展示" },
+    { label: "合同金额", value: formatCurrency(contractAmountResolved.value), source: contractAmountResolved.source, note: "仅展示" },
+    { label: "决算/最终金额", value: formatCurrency(finalAmountResolved.value), source: finalAmountResolved.source, note: "仅展示" },
+    { label: "是否需要审价", value: normalizeValue(getField(result, ["need_cost_review"])), source: resolveFieldWithSource(result, ["need_cost_review"]).source },
+    { label: "维修资金性质/项目属性", value: normalizeValue(getField(result, ["repair_nature", "property_raw_value"])), source: resolveFieldWithSource(result, ["repair_nature", "property_raw_value"]).source },
     {
       label: "申报主体/相关人员",
-      value: applicant === null || applicant === undefined || applicant === "" ? "暂无结构化字段，详见原始材料" : normalizeValue(applicant),
+      value: applicantSummary,
+      source: applicantResolved.source,
     },
   ];
 
-  return { timeline, materials, finance };
+  return {
+    timeline,
+    materials,
+    finance: {
+      heroAmount,
+      compactAmount: formatCompactAmount(heroValue),
+      fullAmount: heroAmount,
+      heroLabel,
+      heroSource,
+      applicantSummary,
+      applicantFullText,
+      applicantSource: applicantResolved.source,
+      traceNote: "字段抽取由本地 LLM 辅助完成，合规判断由规则引擎执行；以下展示字段来源、抽取状态和缺失材料，供审计人员复核。",
+      items: financeItems,
+    },
+  };
 }
 
 function llmDisplay(result: BackendAnalyzeResponse): {

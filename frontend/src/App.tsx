@@ -3,9 +3,11 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   AlertCircle,
   BookOpen,
+  CircleDot,
   ChevronDown,
   ChevronRight,
   ClipboardCheck,
+  Clock3,
   FileText,
   History,
   Info,
@@ -46,6 +48,20 @@ function matrixRiskClass(risk?: "none" | "medium" | "high") {
   if (risk === "high") return "text-rose-300";
   if (risk === "medium") return "text-amber-300";
   return "text-slate-300";
+}
+
+function matrixMaterialStatusClass(status: "已提取" | "缺项" | "未识别" | "需复核") {
+  if (status === "已提取") return "text-emerald-300";
+  if (status === "缺项") return "text-rose-300";
+  if (status === "需复核") return "text-amber-300";
+  return "text-slate-400";
+}
+
+function matrixMaterialDotClass(status: "已提取" | "缺项" | "未识别" | "需复核") {
+  if (status === "已提取") return "bg-emerald-400";
+  if (status === "缺项") return "bg-rose-400";
+  if (status === "需复核") return "bg-amber-400";
+  return "bg-slate-500";
 }
 
 export default function App() {
@@ -404,134 +420,216 @@ export default function App() {
                           <div className="glass-card p-6 text-sm text-emerald-300 border border-emerald-500/30">当前未发现需要展示的问题卡片。</div>
                         )}
                       </div>
-
-                      <div className="glass-card overflow-hidden shadow-2xl relative">
-                        <div className="p-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/5">
-                              <LayoutDashboard className="w-6 h-6 text-indigo-400" />
-                            </div>
-                            <div>
-                              <h3 className="text-lg font-bold text-white tracking-tight">关键审计证据提取矩阵</h3>
-                              <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mt-1">Cross-Reference Data Extraction</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-12 bg-black/20">
-                          <div className="space-y-5">
-                            <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">逻辑时序追踪</h4>
-                            <div className="space-y-3">
-                              {report.matrix.timeline.map((item) => (
-                                <div key={item.label} className="bg-white/[0.03] border border-white/5 rounded-xl p-3">
-                                  <p className="text-[10px] text-slate-400">{item.label}</p>
-                                  <p className={cn("text-sm font-medium mt-1", matrixRiskClass(item.risk))}>{item.value}</p>
-                                  {item.source && <p className="text-[10px] text-slate-500 mt-1">来源：{item.source}</p>}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="space-y-5">
-                            <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">材料扫描结果</h4>
-                            <div className="space-y-2">
-                              {report.matrix.materials.map((item) => (
-                                <div key={item.label} className="flex items-center justify-between bg-white/[0.03] p-3 rounded-xl border border-white/5">
-                                  <span className="text-xs text-slate-300">{item.label}</span>
-                                  <span className="text-[11px] text-slate-400">{item.status}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="space-y-5">
-                            <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">财务要素萃取</h4>
-                            <div className="space-y-2">
-                              {report.matrix.finance.map((item) => (
-                                <div key={item.label} className="bg-white/[0.03] p-3 rounded-xl border border-white/5">
-                                  <p className="text-[10px] text-slate-400">{item.label}</p>
-                                  <p className="text-sm text-slate-200 mt-1">{item.value}</p>
-                                  {item.note && <p className="text-[10px] text-slate-500 mt-1">{item.note}</p>}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="glass-card overflow-hidden shadow-2xl relative">
-                        <button
-                          className="w-full p-5 border-b border-white/5 bg-white/[0.02] flex items-center justify-between"
-                          onClick={() => setShowEvidence((v) => !v)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Info className="w-5 h-5 text-indigo-400" />
-                            <span className="text-sm font-bold text-white">证据区（字段来源 / parser vs LLM）</span>
-                          </div>
-                          {showEvidence ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-                        </button>
-                        {showEvidence && (
-                          <div className="p-6 bg-black/20 grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {report.evidence.map((ev, idx) => (
-                              <div key={`${ev.label}-${idx}`} className="bg-white/[0.03] p-3 rounded-xl border border-white/5 text-xs">
-                                <div className="text-slate-300">{ev.label}</div>
-                                <div className="text-white font-medium mt-1">{ev.value}</div>
-                                <div className="text-slate-500 mt-1">来源：{ev.source}</div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="glass-card overflow-hidden">
-                        <button
-                          className="w-full p-5 border-b border-white/5 bg-white/[0.02] flex items-center justify-between"
-                          onClick={() => setShowAuditorView((v) => !v)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <LayoutDashboard className="w-5 h-5 text-indigo-400" />
-                            <span className="text-sm font-bold text-white">审计人员视图（折叠）</span>
-                          </div>
-                          {showAuditorView ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
-                        </button>
-                        {showAuditorView && (
-                          <div className="p-6 space-y-4 text-xs bg-black/20">
-                            <div>
-                              <h4 className="text-slate-300 mb-2 font-semibold">reason_code</h4>
-                              <p className="text-slate-400">{report.auditorView.reasonCodes.join("，") || "无"}</p>
-                            </div>
-                            <div>
-                              <h4 className="text-slate-300 mb-2 font-semibold">raw_fields</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {report.auditorView.rawFields.map((item, index) => (
-                                  <p key={`${item.label}-${index}`} className="text-slate-400">
-                                    {item.label}：{item.value}
-                                  </p>
-                                ))}
-                              </div>
-                            </div>
-                            <div>
-                              <h4 className="text-slate-300 mb-2 font-semibold">conflicts</h4>
-                              {report.auditorView.conflicts.length === 0 && <p className="text-slate-500">无</p>}
-                              {report.auditorView.conflicts.map((item, index) => (
-                                <p key={`${item.field}-${index}`} className="text-slate-400">
-                                  {item.field_label}：parser={item.parser_value} / llm={item.llm_value} / final={item.final_value}
-                                </p>
-                              ))}
-                            </div>
-                            <div>
-                              <h4 className="text-slate-300 mb-2 font-semibold">llm_diagnostics</h4>
-                              <pre className="text-slate-400 whitespace-pre-wrap break-words bg-white/[0.03] border border-white/10 rounded-xl p-3">
-                                {JSON.stringify(report.auditorView.llmDiagnostics || {}, null, 2)}
-                              </pre>
-                            </div>
-                          </div>
-                        )}
-                      </div>
                     </motion.div>
                   )}
                 </AnimatePresence>
               </div>
+
+              {report && (
+                <div className="lg:col-span-12 space-y-6">
+                  <div className="glass-card overflow-hidden shadow-2xl relative">
+                    <div className="p-8 border-b border-white/5 bg-white/[0.02] flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/5">
+                          <LayoutDashboard className="w-6 h-6 text-indigo-400" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg font-bold text-white tracking-tight">关键审计证据提取矩阵</h3>
+                          <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold mt-1">Cross-Reference Data Extraction</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-8 grid grid-cols-1 md:grid-cols-12 gap-8 bg-black/20">
+                      <div className="space-y-5 md:col-span-5 lg:col-span-3">
+                        <h4 className="text-[11px] font-bold text-indigo-400 tracking-wide flex items-center gap-2">
+                          <Clock3 className="w-4 h-4" />
+                          逻辑时序追踪
+                        </h4>
+                        <div className="matrix-timeline">
+                          {report.matrix.timeline.map((item, index) => (
+                            <div key={`${item.title}-${index}`} className="matrix-timeline-item">
+                              <div className={cn("matrix-timeline-dot", item.risk === "high" ? "matrix-timeline-dot-high" : item.risk === "medium" ? "matrix-timeline-dot-medium" : "matrix-timeline-dot-none")} />
+                              <div className="matrix-timeline-content">
+                                <p className={cn("text-2xl font-bold tracking-tight leading-none", matrixRiskClass(item.risk))}>{item.dateText}</p>
+                                <p className="text-[11px] text-slate-100 mt-3 font-semibold">{item.title}</p>
+                                <p className="text-xs text-slate-400 mt-1 leading-relaxed">{item.description}</p>
+                                <p className="text-[10px] text-slate-500 mt-2">来源：{item.source || "未识别"}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-5 md:col-span-7 lg:col-span-6">
+                        <h4 className="text-[11px] font-bold text-indigo-400 tracking-wide flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          材料扫描结果
+                        </h4>
+                        <div className="bg-white/[0.03] border border-white/10 rounded-2xl overflow-hidden">
+                          <div className="hidden lg:block">
+                            <table className="w-full text-xs table-fixed matrix-evidence-table">
+                              <colgroup>
+                                <col className="w-[26%]" />
+                                <col className="w-[54%]" />
+                                <col className="w-[20%]" />
+                              </colgroup>
+                              <thead>
+                                <tr className="bg-white/[0.04] text-slate-300">
+                                  <th className="text-left p-3 font-semibold">审计要素</th>
+                                  <th className="text-left p-3 font-semibold">来源材料/字段</th>
+                                  <th className="text-left p-3 font-semibold">状态</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {report.matrix.materials.map((item) => (
+                                  <tr key={item.label} className="border-t border-white/5 align-top">
+                                    <td className="p-3 text-slate-100 font-semibold break-words">{item.label}</td>
+                                    <td className="p-3 text-slate-400">
+                                      <p className="break-words whitespace-pre-wrap" title={`来源：${item.source || "未识别"}`}>
+                                        来源：{item.source || "未识别"}
+                                      </p>
+                                    </td>
+                                    <td className="p-3">
+                                      <span className={cn("inline-flex items-center gap-2 text-xs font-bold whitespace-nowrap", matrixMaterialStatusClass(item.status))}>
+                                        <span className={cn("w-2.5 h-2.5 rounded-full", matrixMaterialDotClass(item.status))} />
+                                        {item.status}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          <div className="lg:hidden p-4 space-y-3">
+                            {report.matrix.materials.map((item) => (
+                              <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-sm font-semibold text-slate-100">{item.label}</p>
+                                  <span className={cn("inline-flex items-center gap-2 text-xs font-bold whitespace-nowrap", matrixMaterialStatusClass(item.status))}>
+                                    <span className={cn("w-2.5 h-2.5 rounded-full", matrixMaterialDotClass(item.status))} />
+                                    {item.status}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1 break-words">来源：{item.source || "未识别"}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-5 md:col-span-12 lg:col-span-3">
+                        <h4 className="text-[11px] font-bold text-indigo-400 tracking-wide">财务要素萃取</h4>
+                        <div className="bg-indigo-500/10 border border-indigo-400/30 rounded-3xl p-6 max-w-full overflow-hidden">
+                          <p className="text-xs font-semibold tracking-wide text-indigo-200">{report.matrix.finance.heroLabel}</p>
+                          <p className="text-[clamp(1.35rem,3vw,2.2rem)] font-extrabold text-slate-100 mt-4 leading-none whitespace-nowrap overflow-hidden text-ellipsis">
+                            {report.matrix.finance.compactAmount}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-2">完整金额：{report.matrix.finance.fullAmount}</p>
+                          <p className="text-[10px] text-slate-500 mt-1">来源：{report.matrix.finance.heroSource || "未识别"}</p>
+                          <div className="h-px bg-white/15 my-6" />
+                          <p className="text-xs text-slate-400">申报主体单位</p>
+                          <p title={report.matrix.finance.applicantFullText} className="text-base font-bold text-slate-100 mt-3 leading-snug break-words">
+                            {report.matrix.finance.applicantSummary}
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-2 break-words">完整名单：{report.matrix.finance.applicantFullText}</p>
+                          <p className="text-[10px] text-slate-500 mt-1">来源：{report.matrix.finance.applicantSource || "未识别"}</p>
+                        </div>
+                        <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5 space-y-3">
+                          {report.matrix.finance.items.map((item) => (
+                            <div key={item.label} className="flex items-start justify-between gap-4">
+                              <p className="text-xs text-slate-400">{item.label}</p>
+                              <div className="text-right">
+                                <p className="text-sm text-slate-200">{item.value}</p>
+                                <p className="text-[10px] text-slate-500 mt-1">来源：{item.source || "未识别"}</p>
+                                {item.note && <p className="text-[10px] text-slate-500 mt-1">{item.note}</p>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="bg-white/[0.03] border border-white/10 rounded-2xl p-5">
+                          <p className="text-sm font-semibold text-indigo-300 flex items-center gap-2">
+                            <CircleDot className="w-4 h-4" />
+                            AI 溯源
+                          </p>
+                          <p className="text-sm text-slate-400 mt-2 leading-relaxed">{report.matrix.finance.traceNote}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="glass-card overflow-hidden shadow-2xl relative">
+                    <button
+                      className="w-full p-5 border-b border-white/5 bg-white/[0.02] flex items-center justify-between"
+                      onClick={() => setShowEvidence((v) => !v)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Info className="w-5 h-5 text-indigo-400" />
+                        <span className="text-sm font-bold text-white">证据区（字段来源 / parser vs LLM）</span>
+                      </div>
+                      {showEvidence ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                    </button>
+                    {showEvidence && (
+                      <div className="p-6 bg-black/20 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {report.evidence.map((ev, idx) => (
+                          <div key={`${ev.label}-${idx}`} className="bg-white/[0.03] p-3 rounded-xl border border-white/5 text-xs">
+                            <div className="text-slate-300">{ev.label}</div>
+                            <div className="text-white font-medium mt-1">{ev.value}</div>
+                            <div className="text-slate-500 mt-1">来源：{ev.source}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="glass-card overflow-hidden">
+                    <button
+                      className="w-full p-5 border-b border-white/5 bg-white/[0.02] flex items-center justify-between"
+                      onClick={() => setShowAuditorView((v) => !v)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <LayoutDashboard className="w-5 h-5 text-indigo-400" />
+                        <span className="text-sm font-bold text-white">审计人员视图（折叠）</span>
+                      </div>
+                      {showAuditorView ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+                    </button>
+                    {showAuditorView && (
+                      <div className="p-6 space-y-4 text-xs bg-black/20">
+                        <div>
+                          <h4 className="text-slate-300 mb-2 font-semibold">reason_code</h4>
+                          <p className="text-slate-400">{report.auditorView.reasonCodes.join("，") || "无"}</p>
+                        </div>
+                        <div>
+                          <h4 className="text-slate-300 mb-2 font-semibold">raw_fields</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {report.auditorView.rawFields.map((item, index) => (
+                              <p key={`${item.label}-${index}`} className="text-slate-400">
+                                {item.label}：{item.value}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-slate-300 mb-2 font-semibold">conflicts</h4>
+                          {report.auditorView.conflicts.length === 0 && <p className="text-slate-500">无</p>}
+                          {report.auditorView.conflicts.map((item, index) => (
+                            <p key={`${item.field}-${index}`} className="text-slate-400">
+                              {item.field_label}：parser={item.parser_value} / llm={item.llm_value} / final={item.final_value}
+                            </p>
+                          ))}
+                        </div>
+                        <div>
+                          <h4 className="text-slate-300 mb-2 font-semibold">llm_diagnostics</h4>
+                          <pre className="text-slate-400 whitespace-pre-wrap break-words bg-white/[0.03] border border-white/10 rounded-xl p-3">
+                            {JSON.stringify(report.auditorView.llmDiagnostics || {}, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 

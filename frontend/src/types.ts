@@ -76,9 +76,33 @@ export interface AuditViewModel {
   issues: ViewIssue[];
   evidence: ViewEvidence[];
   matrix: {
-    timeline: Array<{ label: string; value: string; source?: string; risk?: "none" | "medium" | "high" }>;
-    materials: Array<{ label: string; status: "已提取" | "缺项" | "未识别" | "需复核" }>;
-    finance: Array<{ label: string; value: string; note?: string }>;
+    timeline: Array<{
+      dateText: string;
+      title: string;
+      description: string;
+      source: string;
+      risk?: "none" | "medium" | "high";
+    }>;
+    materials: Array<{
+      label: string;
+      status: "已提取" | "缺项" | "未识别" | "需复核";
+      extractionResult: string;
+      source: string;
+      auditImpact: string;
+      remediation?: string;
+    }>;
+    finance: {
+      heroAmount: string;
+      compactAmount: string;
+      fullAmount: string;
+      heroLabel: string;
+      heroSource: string;
+      applicantSummary: string;
+      applicantFullText: string;
+      applicantSource: string;
+      traceNote: string;
+      items: Array<{ label: string; value: string; source: string; note?: string }>;
+    };
   };
   attachments: BackendAttachment[];
   warnings: string[];
