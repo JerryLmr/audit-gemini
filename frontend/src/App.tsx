@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { AuditWorkspace } from "./components/audit-view-panels";
+import { AuditWorkspace, ComplianceSummaryBar, ReportActionCard } from "./components/audit-view-panels";
 import { analyzeFiles } from "./services/auditBackendService";
 import { extractAuditView } from "./services/auditViewMapper";
 import { AuditView } from "./types";
@@ -161,161 +161,174 @@ export default function App() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
-              className="grid grid-cols-1 gap-8 lg:grid-cols-12"
+              className="space-y-8"
             >
-              <aside className="space-y-6 lg:col-span-4">
-                <div className="glass-card flex flex-col gap-4 p-6">
-                  <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
-                    <Upload className="h-4 w-4 text-indigo-400" />
-                    文件上传
-                  </h3>
-                  <div className="group relative">
-                    <input
-                      type="file"
-                      multiple
-                      accept=".pdf,.xlsx,.xls"
-                      onChange={handleFileUpload}
-                      className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                    />
-                    <div className="rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-all group-hover:border-indigo-500 group-hover:bg-white/5">
-                      <Upload className="mx-auto mb-2 h-8 w-8 text-slate-500 transition-transform group-hover:scale-110" />
-                      <p className="text-xs text-slate-300">选择 Excel / PDF 文件（可多选）</p>
-                    </div>
-                  </div>
-
-                  <div className="custom-scrollbar mt-2 max-h-[300px] space-y-2 overflow-y-auto pr-2">
-                    <AnimatePresence initial={false}>
-                      {files.map((file, index) => (
-                        <motion.div
-                          key={`${file.name}-${index}`}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 10 }}
-                          className="group flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3"
-                        >
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div className="shrink-0 text-emerald-400">✓</div>
-                            <div className="min-w-0">
-                              <p className="truncate text-xs text-slate-200">{file.name}</p>
-                              <p className="text-[10px] text-slate-500">
-                                {file.name.toLowerCase().endsWith(".pdf") ? "PDF 原始附件" : "Excel 结构化输入"}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => removeFile(index)}
-                            className="rounded-lg p-1.5 text-rose-400 opacity-0 transition-all hover:bg-rose-500/20 group-hover:opacity-100"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </motion.div>
-                      ))}
-                    </AnimatePresence>
-                    {files.length === 0 && (
-                      <div className="rounded-xl border border-dashed border-white/5 py-8 text-center">
-                        <p className="text-xs italic text-slate-500">暂未导入审计材料</p>
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-[420px_1fr]">
+                <aside className="space-y-6">
+                  <div className="glass-card flex flex-col gap-4 p-6">
+                    <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+                      <Upload className="h-4 w-4 text-indigo-400" />
+                      文件上传
+                    </h3>
+                    <div className="group relative">
+                      <input
+                        type="file"
+                        multiple
+                        accept=".pdf,.xlsx,.xls"
+                        onChange={handleFileUpload}
+                        className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                      />
+                      <div className="rounded-xl border-2 border-dashed border-white/10 p-8 text-center transition-all group-hover:border-indigo-500 group-hover:bg-white/5">
+                        <Upload className="mx-auto mb-2 h-8 w-8 text-slate-500 transition-transform group-hover:scale-110" />
+                        <p className="text-xs text-slate-300">选择 Excel / PDF 文件（可多选）</p>
                       </div>
-                    )}
+                    </div>
+
+                    <div className="custom-scrollbar mt-2 max-h-[300px] space-y-2 overflow-y-auto pr-2">
+                      <AnimatePresence initial={false}>
+                        {files.map((file, index) => (
+                          <motion.div
+                            key={`${file.name}-${index}`}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 10 }}
+                            className="group flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3"
+                          >
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="shrink-0 text-emerald-400">✓</div>
+                              <div className="min-w-0">
+                                <p className="truncate text-xs text-slate-200">{file.name}</p>
+                                <p className="text-[10px] text-slate-500">
+                                  {file.name.toLowerCase().endsWith(".pdf") ? "PDF 原始附件" : "Excel 结构化输入"}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => removeFile(index)}
+                              className="rounded-lg p-1.5 text-rose-400 opacity-0 transition-all hover:bg-rose-500/20 group-hover:opacity-100"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                      {files.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-white/5 py-8 text-center">
+                          <p className="text-xs italic text-slate-500">暂未导入审计材料</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      disabled={!canStart}
+                      onClick={startAudit}
+                      className={cn(
+                        "mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-bold transition-all active:scale-[0.98]",
+                        canStart
+                          ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500"
+                          : "cursor-not-allowed border border-white/5 bg-white/5 text-slate-500"
+                      )}
+                    >
+                      {isAuditing ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          正在执行审计...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="h-5 w-5" />
+                          开始审计
+                        </>
+                      )}
+                    </button>
                   </div>
 
-                  <button
-                    disabled={!canStart}
-                    onClick={startAudit}
-                    className={cn(
-                      "mt-2 flex w-full items-center justify-center gap-2 rounded-xl py-4 font-bold transition-all active:scale-[0.98]",
-                      canStart
-                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-500"
-                        : "cursor-not-allowed border border-white/5 bg-white/5 text-slate-500"
-                    )}
-                  >
-                    {isAuditing ? (
-                      <>
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                        正在执行审计...
-                      </>
-                    ) : (
-                      <>
-                        <Search className="h-5 w-5" />
-                        开始审计
-                      </>
-                    )}
-                  </button>
-                </div>
+                  <div className="glass-card space-y-4 p-6">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">审计展示口径</h3>
+                    {[
+                      ["系统定位", "审计辅助，不替代人工结论"],
+                      ["展示链路", "材料扫描 → 证据 → 法规 → AI解释"],
+                      ["缺失材料", "明确标注，不做伪造"],
+                      ["结论口径", "保留人工复核入口"],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex justify-between border-b border-white/5 pb-2">
+                        <span className="text-[10px] uppercase tracking-wide text-slate-500">{label}</span>
+                        <span className="text-right text-[11px] font-medium text-slate-300">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </aside>
 
-                <div className="glass-card space-y-4 p-6">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">审计展示口径</h3>
-                  {[
-                    ["系统定位", "审计辅助，不替代人工结论"],
-                    ["展示链路", "材料扫描 → 证据 → 法规 → AI解释"],
-                    ["缺失材料", "明确标注，不做伪造"],
-                    ["结论口径", "保留人工复核入口"],
-                  ].map(([label, value]) => (
-                    <div key={label} className="flex justify-between border-b border-white/5 pb-2">
-                      <span className="text-[10px] uppercase tracking-wide text-slate-500">{label}</span>
-                      <span className="text-right text-[11px] font-medium text-slate-300">{value}</span>
-                    </div>
-                  ))}
-                </div>
-              </aside>
+                <section className="w-full space-y-6">
+                  {report && (
+                    <>
+                      <ComplianceSummaryBar view={report} />
+                      <ReportActionCard view={report} />
+                    </>
+                  )}
 
-              <section className="lg:col-span-8">
-                {!report && !isAuditing && !error && (
-                  <motion.div
-                    key="empty"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    className="glass-card flex min-h-[500px] flex-col items-center justify-center p-12 text-center text-slate-500"
-                  >
-                    <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-white/5 bg-white/5">
-                      <LayoutDashboard className="h-10 w-10 opacity-20" />
-                    </div>
-                    <h3 className="text-xl font-bold tracking-tight text-slate-300">审计辅助工作台就绪</h3>
-                    <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-500">
-                      上传材料后将生成证据归集、法规匹配、AI解释和人工复核建议。
-                    </p>
-                  </motion.div>
-                )}
+                  {!report && !isAuditing && !error && (
+                    <motion.div
+                      key="empty"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="glass-card flex min-h-[360px] flex-col items-center justify-center p-12 text-center text-slate-500"
+                    >
+                      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-white/5 bg-white/5">
+                        <LayoutDashboard className="h-10 w-10 opacity-20" />
+                      </div>
+                      <h3 className="text-xl font-bold tracking-tight text-slate-300">审计辅助工作台就绪</h3>
+                      <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-500">
+                        上传材料后将生成合规维度摘要、报告操作区、证据归集和 AI 解释。
+                      </p>
+                    </motion.div>
+                  )}
 
-                {isAuditing && (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="glass-card flex min-h-[500px] flex-col items-center justify-center gap-8 p-12"
-                  >
-                    <div className="relative">
-                      <div className="h-32 w-32 animate-[spin_1s_linear_infinite] rounded-full border-[6px] border-white/5 border-t-indigo-500" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="flex h-16 w-16 animate-pulse items-center justify-center rounded-full bg-indigo-500/10">
-                          <Search className="h-8 w-8 text-indigo-400" />
+                  {isAuditing && (
+                    <motion.div
+                      key="loading"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="glass-card flex min-h-[360px] flex-col items-center justify-center gap-8 p-12"
+                    >
+                      <div className="relative">
+                        <div className="h-28 w-28 animate-[spin_1s_linear_infinite] rounded-full border-[6px] border-white/5 border-t-indigo-500" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="flex h-14 w-14 animate-pulse items-center justify-center rounded-full bg-indigo-500/10">
+                            <Search className="h-7 w-7 text-indigo-400" />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div className="text-center">
-                      <h3 className="text-2xl font-bold text-white">正在构建审计辅助视图</h3>
-                      <p className="mt-2 text-xs text-slate-400">材料扫描、法规匹配与 AI 解释生成中...</p>
-                    </div>
-                  </motion.div>
-                )}
+                      <div className="text-center">
+                        <h3 className="text-2xl font-bold text-white">正在构建审计辅助视图</h3>
+                        <p className="mt-2 text-xs text-slate-400">材料扫描、法规匹配与 AI 解释生成中...</p>
+                      </div>
+                    </motion.div>
+                  )}
 
-                {error && (
-                  <motion.div
-                    key="error"
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="glass-card border-rose-500/20 bg-rose-500/5 p-12 text-center"
-                  >
-                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-rose-500/20 bg-rose-500/10">
-                      <AlertCircle className="h-10 w-10 text-rose-500" />
-                    </div>
-                    <h3 className="text-xl font-bold text-rose-200">请求失败</h3>
-                    <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-rose-400/80">{error}</p>
-                  </motion.div>
-                )}
+                  {error && (
+                    <motion.div
+                      key="error"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="glass-card min-h-[360px] border-rose-500/20 bg-rose-500/5 p-12 text-center"
+                    >
+                      <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full border border-rose-500/20 bg-rose-500/10">
+                        <AlertCircle className="h-10 w-10 text-rose-500" />
+                      </div>
+                      <h3 className="text-xl font-bold text-rose-200">请求失败</h3>
+                      <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-rose-400/80">{error}</p>
+                    </motion.div>
+                  )}
+                </section>
+              </div>
 
-                {report && <AuditWorkspace view={report} />}
-              </section>
+              {report && (
+                <section className="w-full">
+                  <AuditWorkspace view={report} />
+                </section>
+              )}
             </motion.div>
           )}
 
@@ -380,7 +393,7 @@ export default function App() {
 
                 <div className="mb-6 space-y-1 text-sm leading-relaxed text-slate-400">
                   <p>当前政策库为演示版：支持本地开发上传并保存文件列表（localStorage）。</p>
-                  <p>当前审计依据来自规则引擎和内置法规匹配，不宣传为 RAG 主能力。</p>
+                  <p>当前审计依据来自内置审计规则和法规匹配，不宣传为 RAG 主能力。</p>
                   <p>后续可扩展为法规上传、条款检索和法规条款匹配。</p>
                 </div>
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from modules.audit_engine.core.field_resolver import runtime_values
-from modules.audit_engine.services.rule_loader import load_rule_json
 
 
 SOURCE_TYPE_LABELS = {
@@ -66,6 +65,13 @@ RESULT_LABELS = {
     "manual_review": "建议人工复核",
     "info_only": "仅作展示",
     "not_applicable": "不适用",
+}
+
+AUDIT_POINT_LABELS = {
+    "entity_audit": "使用范围审计",
+    "trace_audit": "材料完整性审计",
+    "process_audit": "流程合规审计",
+    "amount_info": "金额/审价审计",
 }
 
 
@@ -277,38 +283,65 @@ def _has_sheet(source_sheets: Iterable[str], names: Sequence[str]) -> bool:
     return any(name in sheet_set for name in names)
 
 
+def _present_sheet(source_sheets: Iterable[str], names: Sequence[str]) -> Optional[str]:
+    sheet_set = {str(item) for item in source_sheets or []}
+    for name in names:
+        if name in sheet_set:
+            return name
+    return None
+
+
 def _bool_value(standard_fields: Dict[str, Any], key: str) -> Optional[bool]:
     value = _value(standard_fields.get(key))
     return value if isinstance(value, bool) else None
 
 
-def _material_scan(standard_fields: Dict[str, Any], source_sheets: List[str]) -> List[Dict[str, Any]]:
+def _active_excel_filename(attachments: List[Dict[str, Any]]) -> str:
+    for item in attachments:
+        filename = str(item.get("filename") or "")
+        if item.get("used_for_audit") is True and filename.lower().endswith((".xlsx", ".xls")):
+            return filename
+    for item in attachments:
+        filename = str(item.get("filename") or "")
+        if filename.lower().endswith((".xlsx", ".xls")):
+            return filename
+    return ""
+
+
+def _material_source(active_excel_filename: str, sheet_name: Optional[str]) -> str:
+    if not sheet_name:
+        return "未识别"
+    return f"{active_excel_filename} / {sheet_name}" if active_excel_filename else sheet_name
+
+
+def _material_scan(standard_fields: Dict[str, Any], source_sheets: List[str], attachments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     need_cost_review = _bool_value(standard_fields, "need_cost_review") is True
     final_amount_present = _present(_value(standard_fields.get("final_amount")))
+    active_excel_filename = _active_excel_filename(attachments)
 
     rows = [
-        ("维修工单", _has_sheet(source_sheets, ["维修工单"]), "维修工单", "建议补充维修工单或报修登记材料。", True),
-        ("维修预案", _has_sheet(source_sheets, ["维修预案", "维修决案"]), "维修预案/维修决案", "建议补充维修预案、维修决案或实施方案材料。", True),
-        ("业主征询意见/表决汇总", _has_sheet(source_sheets, ["业主征询意见", "业主表决汇总"]), "业主征询意见/业主表决汇总", "建议补充业主征询意见或表决汇总材料。", True),
-        ("业主大会决议", _has_sheet(source_sheets, ["业主大会决议"]), "业主大会决议", "建议补充业主大会/业委会决议材料。", True),
-        ("施工合同", _bool_value(standard_fields, "has_construction_contract") is True or _has_sheet(source_sheets, ["施工合同表"]), "施工合同表", "建议补充施工合同或中标/委托文件。", True),
-        ("审价合同", _bool_value(standard_fields, "has_appraisal_contract") is True, "审价合同", "建议补充审价合同或造价咨询委托材料。", need_cost_review),
-        ("审价报告", _bool_value(standard_fields, "has_appraisal_report") is True, "审价报告", "建议补充审价报告或预算审核报告。", need_cost_review),
-        ("验收/完工报告", _has_sheet(source_sheets, ["项目完工报告表", "验收报告", "完工报告"]), "验收/完工报告", "建议补充完工验收材料。", final_amount_present),
+        ("维修工单", _present_sheet(source_sheets, ["维修工单"]), "建议补充维修工单或报修登记材料。", True),
+        ("维修预案", _present_sheet(source_sheets, ["维修预案", "维修决案"]), "建议补充维修预案、维修决案或实施方案材料。", True),
+        ("业主征询意见/表决汇总", _present_sheet(source_sheets, ["业主征询意见", "业主表决汇总"]), "建议补充业主征询意见或表决汇总材料。", True),
+        ("业主大会决议", _present_sheet(source_sheets, ["业主大会决议"]), "建议补充业主大会/业委会决议材料。", True),
+        ("施工合同", _present_sheet(source_sheets, ["施工合同表"]) if _bool_value(standard_fields, "has_construction_contract") is True or _has_sheet(source_sheets, ["施工合同表"]) else None, "建议补充施工合同或中标/委托文件。", True),
+        ("审价合同", _present_sheet(source_sheets, ["审价合同"]) if _bool_value(standard_fields, "has_appraisal_contract") is True else None, "建议补充审价合同或造价咨询委托材料。", need_cost_review),
+        ("审价报告", _present_sheet(source_sheets, ["审价报告", "预算审核报告"]) if _bool_value(standard_fields, "has_appraisal_report") is True else None, "建议补充审价报告或预算审核报告。", need_cost_review),
+        ("验收/完工报告", _present_sheet(source_sheets, ["项目完工报告表", "验收报告", "完工报告"]), "建议补充完工验收材料。", final_amount_present),
     ]
     output = []
-    for name, exists, source, remediation, affects_audit in rows:
-        status = "extracted" if exists else ("missing" if affects_audit else "not_applicable")
+    for name, sheet_name, remediation, affects_audit in rows:
+        status = "extracted" if sheet_name else ("missing" if affects_audit else "not_applicable")
         output.append(
             {
                 "required_item": name,
                 "status": status,
                 "status_label": {"extracted": "已识别", "missing": "缺失", "partial": "部分识别", "not_applicable": "不适用"}[status],
-                "source_label": source if exists else "未识别",
-                "evidence_summary": f"已识别{name}相关材料。" if exists else f"当前材料未识别{name}。",
+                "source_label": _material_source(active_excel_filename, sheet_name),
+                "evidence_summary": f"已识别{name}相关材料。" if sheet_name else f"当前材料未识别{name}。",
                 "affects_audit": bool(affects_audit),
-                "remediation": "" if exists or not affects_audit else remediation,
-                "confidence": 0.9 if exists else (0 if affects_audit else 0.4),
+                "remediation": "" if sheet_name or not affects_audit else remediation,
+                "confidence": 0.9 if sheet_name else (0 if affects_audit else 0.4),
             }
         )
     return output
@@ -375,7 +408,7 @@ def _ai_interpretation(standard_fields: Dict[str, Any], llm_result: Dict[str, An
     missing = [item["required_item"] for item in material_scan if item["status"] == "missing"]
     available = llm_result.get("available") is True
     base_confidence = 0.82 if available else 0.68
-    source_note = "本地 LLM 辅助解释" if available else "规则引擎保守解释"
+    source_note = "本地 LLM 辅助解释" if available else "内置规则保守解释"
 
     items = [
         {
@@ -394,7 +427,7 @@ def _ai_interpretation(standard_fields: Dict[str, Any], llm_result: Dict[str, An
                 "content": f"当前材料未识别{ '、'.join(missing) }，无法形成完整审计闭环，建议补充后人工复核。",
                 "confidence": 0.78,
                 "source_type": "inferred",
-                "source_label": "规则引擎保守解释",
+                "source_label": "内置规则保守解释",
                 "basis_fields": ["material_scan"],
             }
         )
@@ -412,36 +445,33 @@ def _ai_interpretation(standard_fields: Dict[str, Any], llm_result: Dict[str, An
     return items
 
 
-def _policy_matches(standard_fields: Dict[str, Any], audit_result: Dict[str, Any], material_scan: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    values = runtime_values(standard_fields)
-    text = " ".join(str(values.get(key) or "") for key in ["project_name", "repair_scope", "repair_reason"])
-    missing_keys = {
-        "施工合同": "has_construction_contract",
-        "审价合同": "has_appraisal_contract",
-        "审价报告": "has_appraisal_report",
-        "验收/完工报告": "acceptance_report",
-    }
-    missing_items = {missing_keys.get(item["required_item"], item["required_item"]) for item in material_scan if item["status"] == "missing"}
-    rules = load_rule_json("policy_rules.json").get("rules", [])
+def _policy_tags(document: Dict[str, Any]) -> List[str]:
+    title = str(document.get("title") or document.get("display_name") or "")
+    doc_no = str(document.get("document_no") or "")
+    source_type = str(document.get("source_type") or "")
+    tags: List[str] = []
+    if "上海" in title or "沪" in doc_no:
+        tags.append("上海地方")
+    if "民法典" in title or "住宅专项维修资金管理办法" in title:
+        tags.append("国家法规")
+    if source_type == "standard" or "DB31" in doc_no:
+        tags.append("地方标准")
+    if "合同" in title or "审价" in title:
+        tags.append("流程材料")
+    if not tags:
+        tags.append("法规依据")
+    return tags
+
+
+def _policy_matches(audit_result: Dict[str, Any]) -> List[Dict[str, Any]]:
     matches: List[Dict[str, Any]] = []
     seen: set[Tuple[str, str, str]] = set()
-    for rule in rules:
-        keyword_hit = any(keyword in text for keyword in rule.get("keywords", []) or [])
-        missing_hit = any(item in missing_items for item in rule.get("missing_items", []) or [])
-        field_hit = all(values.get(cond.get("field")) == cond.get("equals") for cond in rule.get("field_conditions", []) or [])
-        if not (keyword_hit or missing_hit or field_hit):
-            continue
-        for match in rule.get("policy_matches", []):
-            key = (match.get("policy_title", ""), match.get("article", ""), match.get("related_audit", ""))
-            if key in seen:
-                continue
-            seen.add(key)
-            matches.append(match)
-    for sub in (audit_result.get("sub_audits") or {}).values():
+    for audit_key, sub in (audit_result.get("sub_audits") or {}).items():
+        related_audit = AUDIT_POINT_LABELS.get(audit_key, "审计辅助复核")
         for doc in sub.get("basis_documents", []) or []:
             title = doc.get("title") or doc.get("display_name")
             article = doc.get("article") or ""
-            key = (str(title), str(article), "规则审计")
+            key = (str(title), str(article), related_audit)
             if not title or key in seen:
                 continue
             seen.add(key)
@@ -449,9 +479,9 @@ def _policy_matches(standard_fields: Dict[str, Any], audit_result: Dict[str, Any
                 {
                     "policy_title": title,
                     "article": article,
-                    "tags": ["规则引擎"],
-                    "matched_reason": doc.get("basis_explanation") or doc.get("section") or "规则引擎命中的法规依据。",
-                    "related_audit": "规则审计",
+                    "tags": _policy_tags(doc),
+                    "matched_reason": doc.get("basis_explanation") or doc.get("section") or doc.get("display_text") or "当前审计点命中该法规依据。",
+                    "related_audit": related_audit,
                     "match_type": "requirement",
                     "confidence": 0.82,
                 }
@@ -532,7 +562,7 @@ def _display_conclusion(audit_result: Dict[str, Any], standard_fields: Dict[str,
         main_result = "建议人工复核"
         risk_level = "medium"
 
-    scope_text = "疑似属于共用部位维修，使用维修资金的范围初步具备合理性" if scope_reasonable else "维修范围仍需结合材料确认"
+    scope_text = "通常属于共用部位维修，使用维修资金的范围初步具备合理性" if scope_reasonable else "维修范围仍需结合材料确认"
     missing_text = f"但当前材料中未识别{ '、'.join(missing) }，无法形成完整审计闭环" if missing else "当前关键材料已形成初步证据链"
     next_actions = [item["remediation"] for item in material_scan if item.get("remediation")]
     if not next_actions:
@@ -562,9 +592,9 @@ def build_audit_view(
     source_sheets = source_sheets or []
     llm_result = llm_result or {}
     audit_result = audit_result or {}
-    material_scan = _material_scan(standard_fields, source_sheets)
+    material_scan = _material_scan(standard_fields, source_sheets, attachments)
     structured, low_confidence = _structured_extraction(standard_fields)
-    policy_matches = _policy_matches(standard_fields, audit_result, material_scan)
+    policy_matches = _policy_matches(audit_result)
     return {
         "display_conclusion": _display_conclusion(audit_result, standard_fields, material_scan)
         if standard_fields
