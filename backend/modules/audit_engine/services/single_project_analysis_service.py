@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from fastapi import UploadFile
 
 from modules.audit_engine.services.audit_pipeline_service import run_audit_pipeline
+from modules.audit_engine.services.audit_view_builder import build_audit_view
 from modules.audit_engine.services.llm_field_classifier import classify_fields_with_local_llm
 from modules.audit_engine.services.uploaded_file_parser import parse_uploaded_file
 
@@ -247,11 +248,12 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
     file_list = list(files)
     if not file_list:
         return {
-            "status": "unsupported",
-            "single_project_supported": False,
-            "message": "未上传文件。",
-            "attachments": [],
-            "warnings": ["未上传文件。"],
+            "audit_view": build_audit_view(
+                status="unsupported",
+                message="未上传文件。",
+                attachments=[],
+                warnings=["未上传文件。"],
+            )
         }
 
     warnings: List[str] = []
@@ -287,27 +289,25 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
     if not parsed_excel_files:
         warnings.append("未检测到可用于审计的 Excel 文件。")
         return {
-            "status": "unsupported",
-            "single_project_supported": False,
-            "message": "未检测到可用于审计的 Excel 文件。",
-            "attachments": attachments,
-            "warnings": warnings,
-            "field_conflicts": [],
-            "raw_fields": {},
-            "llm_result": {"available": False, "error_message": "无可审计 Excel"},
+            "audit_view": build_audit_view(
+                status="unsupported",
+                message="未检测到可用于审计的 Excel 文件。",
+                attachments=attachments,
+                llm_result={"available": False, "error_message": "无可审计 Excel"},
+                warnings=warnings,
+            )
         }
 
     selected = _select_row(parsed_excel_files, warnings)
     if not selected or not selected[0] or not selected[1]:
         return {
-            "status": "manual_review",
-            "single_project_supported": False,
-            "message": "Excel 文件未解析到可审计项目。",
-            "attachments": attachments,
-            "warnings": warnings + ["Excel 文件未解析到可审计项目。"],
-            "field_conflicts": [],
-            "raw_fields": {},
-            "llm_result": {"available": False, "error_message": "无可审计项目"},
+            "audit_view": build_audit_view(
+                status="manual_review",
+                message="Excel 文件未解析到可审计项目。",
+                attachments=attachments,
+                llm_result={"available": False, "error_message": "无可审计项目"},
+                warnings=warnings + ["Excel 文件未解析到可审计项目。"],
+            )
         }
 
     file_result, row = selected
@@ -342,19 +342,14 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
 
     audit_result = run_audit_pipeline(final_request)
     return {
-        "status": "analyzed",
-        "single_project_supported": True,
-        "filename": file_result.get("filename"),
-        "parse_mode": file_result.get("parse_mode"),
-        "project_key": row.get("project_key"),
-        "project_name": row.get("project_name"),
-        "source_sheets": row.get("source_sheets") or [],
-        "business_summary": row.get("business_summary") or [],
-        "attachments": attachments,
-        "raw_fields": raw_fields,
-        "llm_result": llm_result,
-        "final_fields": merged["final_fields"],
-        "field_conflicts": structured_conflicts,
-        "audit_result": audit_result,
-        "warnings": warnings + list(row.get("warnings") or []),
+        "audit_view": build_audit_view(
+            status="analyzed",
+            attachments=attachments,
+            standard_fields=merged["final_fields"],
+            source_sheets=row.get("source_sheets") or [],
+            llm_result=llm_result,
+            audit_result=audit_result,
+            warnings=warnings + list(row.get("warnings") or []),
+            field_conflicts=structured_conflicts,
+        )
     }

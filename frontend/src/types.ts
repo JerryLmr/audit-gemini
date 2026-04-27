@@ -1,115 +1,110 @@
-export interface BackendAttachment {
-  filename: string;
-  content_type?: string;
-  file_size?: number | null;
-  status: string;
-  used_for_audit: boolean;
-  message?: string;
-}
+export type AuditSourceType = "original" | "extracted" | "inferred" | "missing" | "manual_required";
 
-export interface BackendFieldConflict {
-  field: string;
+export interface AuditViewField {
+  field_key?: string;
   field_label: string;
-  parser_value: string;
-  llm_value: string;
-  final_value: string;
-  reason: string;
-  evidence?: string;
+  value: unknown;
+  display_value: string;
+  source_type: AuditSourceType;
+  source_label: string;
+  confidence: number;
+  evidence: Array<Record<string, unknown>>;
 }
 
-export interface BackendAuditSubResult {
-  result?: string;
-  display_result?: string;
-  reason_codes?: string[];
-  reasons?: string[];
-  missing_items?: string[];
-  basis_documents?: Array<Record<string, unknown>>;
+export interface AuditTimelineItem {
+  label: string;
+  value: unknown;
+  display_value: string;
+  source_type: AuditSourceType;
+  source_label: string;
+  business_meaning: string;
+  confidence: number;
+  warning?: string | null;
+}
+
+export interface AuditMaterialItem {
+  required_item: string;
+  status: "extracted" | "missing" | "partial" | "not_applicable";
+  status_label: string;
+  source_label: string;
+  evidence_summary: string;
+  affects_audit: boolean;
+  remediation: string;
+  confidence: number;
+}
+
+export interface RawMaterialEvidence {
+  file_name: string;
+  file_type: string;
+  recognized: boolean;
+  role: string;
+  status: string;
+}
+
+export interface StructuredEvidence {
+  field_label: string;
+  value: string;
+  source_type: AuditSourceType;
+  source_label: string;
+  confidence: number;
+}
+
+export interface AiInterpretation {
+  title: string;
+  content: string;
+  confidence: number;
+  source_type: AuditSourceType;
+  source_label: string;
+  basis_fields: string[];
+}
+
+export interface PolicyMatch {
+  policy_title: string;
+  article: string;
+  tags: string[];
+  matched_reason: string;
+  related_audit: string;
+  match_type: "support" | "risk" | "requirement";
+  confidence: number;
+}
+
+export interface AuditCard {
+  audit_type: string;
+  result: string;
+  result_label: string;
+  summary: string;
+  facts_used: string[];
+  policy_matches: Array<Record<string, unknown>>;
+  missing_materials: string[];
+  recommendation: string;
+}
+
+export interface AuditView {
+  display_conclusion: {
+    main_result: string;
+    summary: string;
+    risk_level: "low" | "medium" | "high";
+    next_actions: string[];
+  };
+  project_overview: Record<string, AuditViewField>;
+  timeline: AuditTimelineItem[];
+  material_scan: AuditMaterialItem[];
+  evidence_sections: {
+    raw_materials: RawMaterialEvidence[];
+    structured_extraction: StructuredEvidence[];
+    ai_interpretation: AiInterpretation[];
+    low_confidence_candidates: AuditViewField[];
+  };
+  policy_matches: PolicyMatch[];
+  audit_cards: AuditCard[];
+  auditor_notes: {
+    status: string;
+    warnings: string[];
+    conflict_count: number;
+    llm_status: Record<string, unknown>;
+  };
 }
 
 export interface BackendAnalyzeResponse {
-  status: string;
-  message?: string;
-  project_name?: string;
-  source_sheets?: string[];
-  business_summary?: string[];
-  warnings?: string[];
-  attachments?: BackendAttachment[];
-  raw_fields?: Record<string, unknown>;
-  final_fields?: Record<string, unknown>;
-  llm_result?: Record<string, unknown>;
-  field_conflicts?: BackendFieldConflict[];
-  audit_result?: {
-    overall_result?: string;
-    display_result?: string;
-    sub_audits?: Record<string, BackendAuditSubResult>;
-  };
-}
-
-export interface ViewSection {
-  title: string;
-  result: string;
-  riskLevel: string;
-  summary: string;
-}
-
-export interface ViewIssue {
-  title: string;
-  description: string;
-  suggestion: string;
-  basis: string[];
-}
-
-export interface ViewEvidence {
-  label: string;
-  value: string;
-  source: string;
-}
-
-export interface AuditViewModel {
-  projectName: string;
-  summary: string;
-  overallResult: string;
-  riskLevel: string;
-  llmStatus: string;
-  llmModel: string;
-  sections: ViewSection[];
-  issues: ViewIssue[];
-  evidence: ViewEvidence[];
-  matrix: {
-    timeline: Array<{
-      dateText: string;
-      title: string;
-      description: string;
-      source: string;
-      risk?: "none" | "medium" | "high";
-    }>;
-    materials: Array<{
-      label: string;
-      status: "已提取" | "缺项" | "未识别" | "需复核";
-      extractionResult: string;
-      source: string;
-      auditImpact: string;
-      remediation?: string;
-    }>;
-    finance: {
-      heroAmount: string;
-      compactAmount: string;
-      fullAmount: string;
-      heroLabel: string;
-      heroSource: string;
-      applicantSummary: string;
-      applicantFullText: string;
-      applicantSource: string;
-      traceNote: string;
-      items: Array<{ label: string; value: string; source: string; note?: string }>;
-    };
-  };
-  attachments: BackendAttachment[];
-  warnings: string[];
-  auditorView: {
-    reasonCodes: string[];
-    rawFields: Array<{ label: string; value: string }>;
-    conflicts: BackendFieldConflict[];
-    llmDiagnostics: Record<string, unknown>;
-  };
+  audit_view: AuditView;
 }

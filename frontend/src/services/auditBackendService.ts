@@ -39,7 +39,8 @@ export async function analyzeFiles(files: File[]): Promise<BackendAnalyzeRespons
   }
 
   if (!res.ok) {
-    throw new Error(body?.message || `后端服务请求失败（${res.status}）`);
+    const summary = body?.audit_view?.display_conclusion?.summary;
+    throw new Error(summary || `后端服务请求失败（${res.status}）`);
   }
   return body;
 }
