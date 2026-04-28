@@ -77,6 +77,24 @@ function toneBorderClass(tone: Tone) {
   }[tone];
 }
 
+function complianceSummaryClass(tone: Tone) {
+  return {
+    emerald: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
+    amber: "border-amber-500/20 bg-amber-500/10 text-amber-400",
+    rose: "border-rose-500/20 bg-rose-500/10 text-rose-400",
+    indigo: "border-indigo-500/20 bg-indigo-500/10 text-indigo-400",
+    cyan: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
+    blue: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
+    slate: "border-slate-500/20 bg-slate-500/10 text-slate-400",
+  }[tone];
+}
+
+function complianceSummaryBadgeClass(risk: AuditView["display_conclusion"]["risk_level"]) {
+  if (risk === "high") return "border-rose-500/30 bg-rose-500/20 text-rose-400";
+  if (risk === "medium") return "border-amber-500/30 bg-amber-500/20 text-amber-400";
+  return "border-emerald-500/30 bg-emerald-500/20 text-emerald-400";
+}
+
 function issueAccentClass(tone: Tone) {
   return {
     emerald: "border-l-emerald-400",
@@ -194,24 +212,39 @@ function todayText() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function displayActionText(item: string) {
+  return item.trim().replace(/[。.;；\s]+$/g, "");
+}
+
 export function ComplianceSummaryBar({ view }: { view: AuditView }) {
+  const conclusion = view.display_conclusion;
   return (
-    <section className="grid w-full grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      {buildComplianceDimensions(view).map((item) => (
-        <div key={item.label} className={`rounded-2xl border px-4 py-3 ${toneBorderClass(item.tone)}`}>
-          <p className="text-[11px] font-semibold text-slate-400">{item.label}</p>
-          <p className="mt-1 text-sm font-bold text-white">{item.value}</p>
+    <section className="glass-card p-6">
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <h3 className="text-sm font-medium uppercase tracking-wide text-slate-400">合规维度摘要</h3>
+        <div className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-widest ${complianceSummaryBadgeClass(conclusion.risk_level)}`}>
+          {conclusion.main_result}
         </div>
-      ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+        {buildComplianceDimensions(view).map((item) => (
+          <div key={item.label} className={`rounded-xl border p-3 text-center transition-all ${complianceSummaryClass(item.tone)}`}>
+            <p className="text-[9px] font-bold uppercase tracking-tighter opacity-80">{item.label}</p>
+            <p className="mt-1 text-xs font-bold">{item.value}</p>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
 
 export function ReportActionCard({ view }: { view: AuditView }) {
   const conclusion = view.display_conclusion;
+  const nextActions = conclusion.next_actions.map(displayActionText).filter(Boolean).slice(0, 4);
   return (
-    <section className="glass-card border border-cyan-400/10 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_34%),rgba(15,23,42,0.72)] p-6">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+    <section className="glass-card border border-cyan-400/10 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_34%),rgba(15,23,42,0.72)] p-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0">
           <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">Report Actions</p>
           <h3 className="mt-2 break-words text-lg font-black text-white">{projectTitle(view)}</h3>
@@ -229,19 +262,24 @@ export function ReportActionCard({ view }: { view: AuditView }) {
           下载审计报告
         </button>
       </div>
-      <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-5">
+      <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-5">
         <div className="mb-3 flex items-center gap-2">
           <BrainCircuit className="h-4 w-4 text-cyan-300" />
           <p className="text-sm font-bold text-white">AI 审计综合意见</p>
         </div>
         <p className="text-sm leading-relaxed text-slate-300">{conclusion.summary}</p>
-        {conclusion.next_actions.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {conclusion.next_actions.slice(0, 4).map((item) => (
-              <span key={item} className="rounded-full border border-white/10 bg-white/[0.035] px-3 py-1 text-[11px] text-slate-300">
+        {nextActions.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-3 border-t border-white/10 pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-200/80">
+              建议补充材料
+            </p>
+            <div className="space-y-2">
+            {nextActions.map((item) => (
+              <p key={item} className="border-l-2 border-cyan-400/40 bg-white/[0.025] px-3 py-2 text-xs leading-relaxed text-slate-300">
                 {item}
-              </span>
+              </p>
             ))}
+            </div>
           </div>
         )}
       </div>
