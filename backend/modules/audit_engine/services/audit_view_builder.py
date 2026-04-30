@@ -328,9 +328,9 @@ def _pdf_source_label(item: Dict[str, Any]) -> str:
 
 def _pdf_evidence_summary(item: Dict[str, Any]) -> str:
     labels = []
-    for field_key, evidence in (item.get("extracted_fields") or {}).items():
-        if isinstance(evidence, dict) and evidence.get("normalized_value") is not None:
-            labels.append(FIELD_LABELS.get(field_key, field_key))
+    for evidence in (item.get("raw_evidence") or []):
+        if isinstance(evidence, dict) and evidence.get("value") is not None:
+            labels.append(str(evidence.get("label") or evidence.get("raw_field") or ""))
     labels = labels[:3]
     if not labels:
         return "已识别PDF材料类型。"
@@ -420,19 +420,19 @@ def _pdf_extraction(pdf_parse_results: List[Dict[str, Any]]) -> List[Dict[str, A
     output: List[Dict[str, Any]] = []
     for item in pdf_parse_results or []:
         extracted_fields = []
-        for field_key, evidence in (item.get("extracted_fields") or {}).items():
+        for evidence in (item.get("raw_evidence") or []):
             if not isinstance(evidence, dict):
                 continue
-            if evidence.get("normalized_value") is None:
+            if evidence.get("value") is None:
                 continue
-            page = evidence.get("source_page") or 1
+            page = evidence.get("page") or evidence.get("source_page") or 1
             extracted_fields.append(
                 {
-                    "field_key": field_key,
-                    "field_label": FIELD_LABELS.get(field_key, field_key),
-                    "value": evidence.get("normalized_value"),
+                    "field_key": evidence.get("raw_field") or "",
+                    "field_label": evidence.get("label") or evidence.get("raw_field") or "",
+                    "value": evidence.get("value"),
                     "source_label": f"{item.get('filename') or ''} / 第{page}页",
-                    "raw_value": evidence.get("raw_value"),
+                    "raw_value": evidence.get("raw_text"),
                     "confidence": float(evidence.get("confidence") or 0.8),
                     "source_page": page,
                 }
@@ -668,6 +668,9 @@ def build_audit_view(
     warnings: Optional[List[str]] = None,
     field_conflicts: Optional[List[Dict[str, Any]]] = None,
     pdf_parse_results: Optional[List[Dict[str, Any]]] = None,
+    flat_standard_fields: Optional[Dict[str, Any]] = None,
+    field_sources: Optional[Dict[str, Any]] = None,
+    material_evidence: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     standard_fields = standard_fields or {}
     attachments = attachments or []
@@ -675,6 +678,9 @@ def build_audit_view(
     llm_result = llm_result or {}
     audit_result = audit_result or {}
     pdf_parse_results = pdf_parse_results or []
+    flat_standard_fields = flat_standard_fields or {}
+    field_sources = field_sources or {}
+    material_evidence = material_evidence or []
     material_scan = _material_scan(standard_fields, source_sheets, attachments, pdf_parse_results)
     structured, low_confidence = _structured_extraction(standard_fields)
     policy_matches = _policy_matches(audit_result)
@@ -689,6 +695,9 @@ def build_audit_view(
             "next_actions": ["请补充可解析的 Excel 业务包后重新审计。"],
         },
         "project_overview": {key: _field_entry(standard_fields, key) for key in OVERVIEW_FIELDS},
+        "flat_standard_fields": flat_standard_fields,
+        "field_sources": field_sources,
+        "material_evidence": material_evidence,
         "timeline": _timeline_from_candidates(standard_fields) if standard_fields else [],
         "material_scan": material_scan,
         "evidence_sections": {

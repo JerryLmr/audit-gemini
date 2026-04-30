@@ -107,6 +107,9 @@ export interface AuditView {
     next_actions: string[];
   };
   project_overview: Record<string, AuditViewField>;
+  flat_standard_fields?: Record<string, unknown>;
+  field_sources?: Record<string, Array<Record<string, unknown>>>;
+  material_evidence?: Array<Record<string, unknown>>;
   timeline: AuditTimelineItem[];
   material_scan: AuditMaterialItem[];
   evidence_sections: {

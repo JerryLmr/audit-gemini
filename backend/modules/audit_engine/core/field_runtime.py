@@ -13,6 +13,7 @@ class FieldCandidate:
     raw_value: Any
     normalized_value: Any
     confidence: float = 1.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -23,6 +24,7 @@ class FieldCandidate:
             "raw_value": self.raw_value,
             "normalized_value": self.normalized_value,
             "confidence": self.confidence,
+            "metadata": self.metadata,
         }
 
     @classmethod
@@ -35,6 +37,7 @@ class FieldCandidate:
             raw_value=value.get("raw_value"),
             normalized_value=value.get("normalized_value"),
             confidence=float(value.get("confidence", 1.0)),
+            metadata=value.get("metadata") if isinstance(value.get("metadata"), dict) else {},
         )
 
 
@@ -69,4 +72,3 @@ class FieldRuntime:
             candidates=candidates,
             selected_index=int(value.get("selected_index", -1)),
         )
-

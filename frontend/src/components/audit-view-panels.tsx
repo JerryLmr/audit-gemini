@@ -621,6 +621,16 @@ export function MaterialScanPanel({ view }: { view: AuditView }) {
 
 export function EvidenceExplorer({ view }: { view: AuditView }) {
   const pdfExtraction = view.evidence_sections.pdf_extraction || [];
+  const fieldSources = view.field_sources || {};
+  const fieldLabelMap = Object.fromEntries(
+    Object.entries(view.project_overview || {}).map(([key, value]) => [key, value.field_label || key]),
+  );
+  const evidenceByField = Object.entries(fieldSources)
+    .map(([fieldKey, sources]) => {
+      const sourceList = (sources || []).filter((source) => source.source_type === "pdf" || source.source_type === "excel");
+      return { fieldKey, sources: sourceList };
+    })
+    .filter((item) => item.sources.length > 0);
   return (
     <section className="glass-card p-6">
       <div className="mb-5 flex items-center gap-3">
@@ -698,30 +708,37 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
           </div>
         </div>
       </div>
-      {pdfExtraction.length > 0 && (
+      {(pdfExtraction.length > 0 || evidenceByField.length > 0) && (
         <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
           <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
             <FileText className="h-4 w-4 text-cyan-300" />
             PDF材料佐证
           </h4>
           <div className="space-y-4">
-            {pdfExtraction.map((pdf) => (
-              <div key={pdf.file_name} className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs">
-                <p className="break-words font-semibold text-slate-100">{pdf.file_name}</p>
+            {evidenceByField.map((entry) => (
+              <div key={entry.fieldKey} className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs">
+                <p className="font-semibold text-slate-100">{fieldLabelMap[entry.fieldKey] || entry.fieldKey}</p>
                 <p className="mt-1 text-slate-400">
-                  {pdf.material_type_label} · {pdf.status_label}
+                  标准值：{String((view.flat_standard_fields || {})[entry.fieldKey] ?? "未识别")}
                 </p>
                 <div className="mt-2 space-y-2">
-                  {pdf.extracted_fields.map((field) => (
-                    <div key={`${pdf.file_name}-${field.field_key}-${field.source_page}`} className="border-t border-white/5 pt-2">
-                      <p className="text-slate-200">
-                        {field.field_label}：{String(field.value)}
-                      </p>
-                      <p className="break-words text-slate-500">来源：{field.source_label}</p>
-                      <p className="break-words text-slate-500">原文：{field.raw_value}</p>
-                      <p className="text-slate-500">置信度：{Math.round(field.confidence * 100)}%</p>
-                    </div>
-                  ))}
+                  {entry.sources.map((source, index) => {
+                    const metadata = (source.metadata || {}) as Record<string, unknown>;
+                    return (
+                      <div key={`${entry.fieldKey}-${index}`} className="border-t border-white/5 pt-2">
+                        <p className="break-words text-slate-300">
+                          来源：{String(source.file_name || "")}
+                          {metadata.page ? ` / 第${String(metadata.page)}页` : ""}
+                        </p>
+                        <p className="break-words text-slate-500">
+                          {metadata.raw_text ? `原文：${String(metadata.raw_text)}` : `原字段：${String(source.source_field || "")}`}
+                        </p>
+                        <p className="text-slate-500">
+                          置信度：{Math.round(Number(source.confidence || 0) * 100)}%
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
