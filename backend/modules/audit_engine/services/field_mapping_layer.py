@@ -230,6 +230,20 @@ def _map_project_item_code(sources: Dict[str, Dict[str, Any]]) -> Tuple[Optional
     return str(value), _record("project_item_code", str(value), source or "", field)
 
 
+def _map_applicant(sources: Dict[str, Dict[str, Any]]) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    value, source, field = _first_non_empty(
+        sources,
+        (
+            ("excel", "hc_name"),
+            ("blueprint", "hc_name"),
+            ("blueprint_draft", "hc_name"),
+        ),
+    )
+    if not _is_present(value):
+        return None, None
+    return str(value), _record("applicant", str(value), source or "", field)
+
+
 def _map_property_fields(sources: Dict[str, Dict[str, Any]]) -> Tuple[Dict[str, Any], List[Dict[str, Any]], List[str]]:
     value, source, field = _first_existing(
         sources,
@@ -436,6 +450,10 @@ def build_field_mapping_layer(payload: Dict[str, Any]) -> Dict[str, Any]:
     if project_item_code_record:
         standard_fields["project_item_code"] = project_item_code
         records.append(project_item_code_record)
+    applicant, applicant_record = _map_applicant(sources)
+    if applicant_record:
+        standard_fields["applicant"] = applicant
+        records.append(applicant_record)
 
     property_fields, property_records, property_warnings = _map_property_fields(sources)
     standard_fields.update(property_fields)

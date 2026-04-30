@@ -1,4 +1,4 @@
-export type AuditSourceType = "original" | "extracted" | "inferred" | "missing" | "manual_required";
+export type AuditSourceType = "original" | "extracted" | "inferred" | "missing" | "manual_required" | "confirmed";
 
 export interface AuditViewField {
   field_key?: string;

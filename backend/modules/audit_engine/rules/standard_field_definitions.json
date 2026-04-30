@@ -31,6 +31,17 @@
       "required_for_audit": false,
       "comment": "工程或项目编号，仅用于解释、追踪和展示。"
     },
+    "applicant": {
+      "field_name": "申报主体",
+      "field_key": "applicant",
+      "category": "项目身份",
+      "type": "string|null",
+      "field_level": "原始事实",
+      "description": "申报主体（业主大会/业委会等），用于展示与留痕。",
+      "source_priority": ["excel.hc_name", "业主大会决议.HC_NAME", "pdf"],
+      "required_for_audit": false,
+      "comment": "申报主体展示字段；当前用于概览和来源追溯。"
+    },
     "property_raw_value": {
       "field_name": "工程性质原始值",
       "field_key": "property_raw_value",

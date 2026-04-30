@@ -41,6 +41,8 @@ type IssueCard = {
 function sourceBadgeClass(type: AuditSourceType) {
   if (type === "original")
     return "border-blue-400/30 bg-blue-500/10 text-blue-200";
+  if (type === "confirmed")
+    return "border-emerald-400/30 bg-emerald-500/10 text-emerald-200";
   if (type === "extracted")
     return "border-emerald-400/30 bg-emerald-500/10 text-emerald-200";
   if (type === "inferred")
@@ -56,7 +58,8 @@ function sourceLabel(type: AuditSourceType) {
     extracted: "抽取",
     inferred: "推断",
     missing: "缺失",
-    manual_required: "人工复核",
+    manual_required: "人工输入",
+    confirmed: "已确认",
   }[type];
 }
 
@@ -647,7 +650,7 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
       return `${fileName}${page} / ${label || "PDF字段"}`;
     }
     if (String(source.source_type || "") === "excel") {
-      return `${fileName}${sheet ? ` / ${sheet}` : ""}${field ? ` / ${field}` : ""}`;
+      return `Excel / ${fileName}${sheet ? ` / ${sheet}` : ""}${field ? ` / ${field}` : ""}`;
     }
     if (String(source.source_type || "") === "manual_input") {
       return "人工输入";
@@ -823,7 +826,7 @@ export function ConflictConfirmPanel({
   onConfirm,
 }: {
   view: AuditView;
-  onConfirm?: (overrides: Record<string, unknown>) => void;
+  onConfirm?: (overrides: Record<string, { value: unknown; mode: "confirmed" | "manual"; source: string }>) => void;
 }) {
   const conflicts = view.field_conflicts || [];
   const fieldSources = view.field_sources || {};
@@ -885,14 +888,20 @@ export function ConflictConfirmPanel({
       <button
         className="mt-4 rounded border border-amber-300/30 px-3 py-2 text-amber-200 hover:bg-amber-500/10"
         onClick={() => {
-          const payload: Record<string, unknown> = {};
+          const payload: Record<string, { value: unknown; mode: "confirmed" | "manual"; source: string }> = {};
           const nextOverrides: Array<Record<string, unknown>> = [];
           conflicts.forEach((conflict, idx) => {
             const fieldKey = String(conflict.field || "");
             const options = sourceOptions[idx]?.sources || [];
             const selected = selection[fieldKey] || "source-0";
             const selectedValue = selected === "manual" ? manualValues[fieldKey] || "" : options[Number(selected.split("-")[1])]?.value;
-            payload[fieldKey] = selectedValue;
+            const sourceType = selected === "manual" ? "manual" : String(options[Number(selected.split("-")[1])]?.source_type || "").toLowerCase();
+            const source = sourceType === "excel" ? "Excel" : sourceType === "pdf" ? "PDF" : sourceType;
+            payload[fieldKey] = {
+              value: selectedValue,
+              mode: selected === "manual" ? "manual" : "confirmed",
+              source,
+            };
             nextOverrides.push({ field_key: fieldKey, selected_value: selectedValue, selected_by: "user_override", selected_at: new Date().toISOString() });
           });
           setOverrides(nextOverrides);
@@ -1066,21 +1075,28 @@ export function AuditorNotesPanel({ view }: { view: AuditView }) {
 }
 
 export function AuditWorkspace({ view }: { view: AuditView }) {
-  const [localOverrides, setLocalOverrides] = useState<Record<string, unknown>>({});
+  const [localOverrides, setLocalOverrides] = useState<Record<string, { value: unknown; mode: "confirmed" | "manual"; source: string }>>({});
   const effectiveView = useMemo(() => {
     if (!Object.keys(localOverrides).length) return view;
     const next = { ...view };
-    next.flat_standard_fields = { ...(view.flat_standard_fields || {}), ...localOverrides };
+    const nextFlat = { ...(view.flat_standard_fields || {}) };
+    Object.entries(localOverrides).forEach(([k, v]) => {
+      nextFlat[k] = v.value;
+    });
+    next.flat_standard_fields = nextFlat;
     const nextOverview = { ...(view.project_overview || {}) };
-    Object.entries(localOverrides).forEach(([key, value]) => {
+    Object.entries(localOverrides).forEach(([key, override]) => {
       const entry = nextOverview[key];
       if (entry) {
         nextOverview[key] = {
           ...entry,
-          value,
-          display_value: String(value ?? "未识别"),
-          source_type: "manual_required",
-          source_label: "人工确认覆盖（会话态）",
+          value: override.value,
+          display_value: String(override.value ?? "未识别"),
+          source_type: override.mode === "manual" ? "manual_required" : "confirmed",
+          source_label:
+            override.mode === "manual"
+              ? "人工输入覆盖（会话态）"
+              : `已确认采用：${override.source}`,
         };
       }
     });

@@ -193,6 +193,8 @@ def _field_entry(standard_fields: Dict[str, Any], key: str, *, fallback_label: O
 
     if isinstance(runtime, dict) and runtime.get("status") in {"inferred", "llm_classified"}:
         source_type = "inferred" if source_type != "extracted" else "extracted"
+    if isinstance(runtime, dict) and runtime.get("status") == "conflicting" and source_label:
+        source_label = f"系统推荐：{source_label}"
     return {
         "field_key": key,
         "field_label": label,
