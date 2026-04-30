@@ -35,7 +35,10 @@ FIELD_LABELS = {
     "final_amount": "决算/最终金额",
     "repair_scope": "维修范围",
     "repair_reason": "维修原因",
-    "vote_date": "表决日期",
+    "vote_start_date": "征询开始日期",
+    "vote_end_date": "征询结束日期",
+    "resolution_date": "决议生成日期",
+    "registration_date": "录入日期",
     "vote_pass_rate_by_household": "按户数通过率",
     "vote_pass_rate_by_area": "按面积通过率",
 }
@@ -125,6 +128,12 @@ def _raw_fields_from_standard_fields(standard_fields: Dict[str, Any]) -> Dict[st
         for field_key, runtime in (standard_fields or {}).items()
         if _runtime_value(runtime) is not None
     }
+
+
+def _external_flat_fields(standard_fields: Dict[str, Any]) -> Dict[str, Any]:
+    values = runtime_values(standard_fields)
+    values.pop("vote_date", None)
+    return values
 
 
 def _raw_text_from_row(row: Dict[str, Any], standard_fields: Dict[str, Any]) -> str:
@@ -230,6 +239,12 @@ def _build_structured_conflicts(standard_fields: Dict[str, Any]) -> List[Dict[st
         selected = candidates[selected_index] if isinstance(selected_index, int) and 0 <= selected_index < len(candidates) else None
         pdf_candidate = next((c for c in candidates if c.get("source_type") == "pdf"), None)
         excel_candidate = next((c for c in candidates if c.get("source_type") == "excel"), None)
+        scored = []
+        for c in candidates:
+            score = float(c.get("confidence") or 0) + float(((c.get("metadata") or {}).get("quality_score") or 0))
+            scored.append((c, score))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        score_gap = round(scored[0][1] - scored[1][1], 3) if len(scored) >= 2 else None
         conflicts.append(
             {
                 "field": field_key,
@@ -238,6 +253,7 @@ def _build_structured_conflicts(standard_fields: Dict[str, Any]) -> List[Dict[st
                 "pdf_value": pdf_candidate.get("normalized_value") if pdf_candidate else None,
                 "excel_value": excel_candidate.get("normalized_value") if excel_candidate else None,
                 "chosen_source": selected.get("source_type") if selected else "",
+                "score_gap": score_gap,
                 "reason": "多来源不一致，系统按优先级选值，建议人工复核。",
             }
         )
@@ -302,6 +318,7 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
                 field_sources={},
                 material_evidence=_dedupe_material_evidence(pdf_mapped["material_evidence"]),
                 field_conflicts=[],
+                user_overrides=[],
             )
         }
 
@@ -348,8 +365,9 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
             audit_result=audit_result,
             warnings=warnings + list(row.get("warnings") or []) + list(llm_result.get("warnings") or []),
             field_conflicts=field_conflicts,
-            flat_standard_fields=runtime_values(merged["final_fields"]),
+            flat_standard_fields=_external_flat_fields(merged["final_fields"]),
             field_sources=_build_field_sources(merged["final_fields"]),
             material_evidence=_dedupe_material_evidence(pdf_mapped["material_evidence"]),
+            user_overrides=[],
         )
     }

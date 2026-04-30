@@ -30,6 +30,10 @@ FIELD_LABELS = {
     "is_public_part": "共用部位/设施",
     "is_private_part": "专有部分",
     "is_property_service_scope": "物业服务范围",
+    "vote_start_date": "征询开始日期",
+    "vote_end_date": "征询结束日期",
+    "resolution_date": "决议生成日期",
+    "registration_date": "录入日期",
 }
 
 OVERVIEW_FIELDS = [
@@ -227,9 +231,10 @@ def _timeline_item(
 
 
 def _timeline_from_candidates(standard_fields: Dict[str, Any]) -> List[Dict[str, Any]]:
-    request_start = _candidate_by_column(standard_fields, "vote_date", ["REQUEST_STARTDATE", "发送征求意见表开始日期"])
-    request_end = _candidate_by_column(standard_fields, "vote_date", ["REQUEST_ENDDATE", "发送征求意见表结束日期"])
-    reg_date = _candidate_by_column(standard_fields, "vote_date", ["REG_DATE", "决议生成日期"])
+    request_start = _selected_candidate(standard_fields.get("vote_start_date") or {})
+    request_end = _selected_candidate(standard_fields.get("vote_end_date") or {})
+    reg_date = _selected_candidate(standard_fields.get("registration_date") or {})
+    resolution_date = _selected_candidate(standard_fields.get("resolution_date") or {})
     start = _field_entry(standard_fields, "construction_start_date")
     finish = _field_entry(standard_fields, "construction_finish_date")
 
@@ -258,6 +263,17 @@ def _timeline_from_candidates(standard_fields: Dict[str, Any]) -> List[Dict[str,
             "系统中的决议记录/登记日期，不等同于维修预案或决案形成日期",
             float(reg_date.get("confidence") or 0.9) if reg_date else 0,
             "该日期不能直接作为维修预案/决案形成时间" if reg_date else "当前材料未识别决议录入日期",
+        )
+    )
+    timeline.append(
+        _timeline_item(
+            "决议生成日期",
+            resolution_date.get("normalized_value") if resolution_date else None,
+            "original" if resolution_date else "missing",
+            _candidate_source(resolution_date) if resolution_date else "未识别",
+            "决议文本形成日期，需与征询时间共同判定流程时序",
+            float(resolution_date.get("confidence") or 0.9) if resolution_date else 0,
+            "当前材料未识别决议生成日期" if not resolution_date else None,
         )
     )
 
@@ -671,6 +687,7 @@ def build_audit_view(
     flat_standard_fields: Optional[Dict[str, Any]] = None,
     field_sources: Optional[Dict[str, Any]] = None,
     material_evidence: Optional[List[Dict[str, Any]]] = None,
+    user_overrides: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     standard_fields = standard_fields or {}
     attachments = attachments or []
@@ -681,6 +698,7 @@ def build_audit_view(
     flat_standard_fields = flat_standard_fields or {}
     field_sources = field_sources or {}
     material_evidence = material_evidence or []
+    user_overrides = user_overrides or []
     material_scan = _material_scan(standard_fields, source_sheets, attachments, pdf_parse_results)
     structured, low_confidence = _structured_extraction(standard_fields)
     policy_matches = _policy_matches(audit_result)
@@ -698,6 +716,8 @@ def build_audit_view(
         "flat_standard_fields": flat_standard_fields,
         "field_sources": field_sources,
         "material_evidence": material_evidence,
+        "field_conflicts": field_conflicts or [],
+        "user_overrides": user_overrides,
         "timeline": _timeline_from_candidates(standard_fields) if standard_fields else [],
         "material_scan": material_scan,
         "evidence_sections": {

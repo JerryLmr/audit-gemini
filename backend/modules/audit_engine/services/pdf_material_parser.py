@@ -168,7 +168,8 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
                     evidence.append(item)
         elif material_type == "vote_summary_pdf":
             for item in [
-                _find_line_value(raw_page1, ["征询时间", "表决时间"], "征询时间", "vote_date", _to_date, 0.86),
+                _find_line_value(raw_page1, ["征询时间", "表决时间", "征询结束日期"], "征询结束日期", "vote_end_date", _to_date, 0.86),
+                _find_line_value(raw_page1, ["征询开始日期"], "征询开始日期", "vote_start_date", _to_date, 0.84),
                 _find_line_value(raw_page1, ["同意票数比例"], "同意票数比例", "agree_count_rate", _to_percent, 0.8),
                 _find_line_value(raw_page1, ["同意面积比例"], "同意面积比例", "agree_area_rate", _to_percent, 0.8),
             ]:
@@ -181,6 +182,8 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
                 _find_line_value(raw_page1, ["编号", "决议编号"], "编号", "resolution_no", None, 0.84),
                 _find_line_value(raw_page1, ["征询开始日期", "发送征求意见表开始日期"], "征询开始日期", "vote_start_date", _to_date, 0.86),
                 _find_line_value(raw_page1, ["征询结束日期", "发送征求意见表结束日期"], "征询结束日期", "vote_end_date", _to_date, 0.86),
+                _find_line_value(raw_page1, ["决议生成日期"], "决议生成日期", "resolution_date", _to_date, 0.84),
+                _find_line_value(raw_page1, ["录入日期"], "录入日期", "registration_date", _to_date, 0.82),
                 _find_line_value(raw_page1, ["原维修资金预算金额", "预算金额"], "原维修资金预算金额", "budget_amount", _to_amount, 0.86),
                 _find_line_value(raw_page1, ["工程决案总金额", "决案总金额"], "工程决案总金额", "final_amount", _to_amount, 0.86),
             ]:

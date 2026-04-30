@@ -11,15 +11,6 @@ TRUTHY = {"1", "true", "y", "yes", "是", "有", "已签", "已", "存在", "已
 FALSY = {"0", "false", "n", "no", "否", "无", "未签", "未", "不存在", "未通过"}
 OUT_OF_WARRANTY_KEYWORDS = ("过保", "已过保", "超过保修", "保修期外", "出保")
 IN_WARRANTY_KEYWORDS = ("保修期内", "未过保", "尚未过保", "仍在保修期", "在保")
-PROXY_VOTE_DATE_FIELDS = {
-    "request_enddate",
-    "发送征求意见表结束日期",
-    "request_startdate",
-    "发送征求意见表开始日期",
-    "reg_date",
-    "决议生成日期",
-}
-
 
 def _is_present(value: Any) -> bool:
     return value is not None and value != ""
@@ -124,7 +115,7 @@ def resolve_field(
         list(candidates or []),
         key=lambda candidate: (
             _priority_index(candidate, definition.get("source_priority", [])),
-            -float(candidate.confidence or 0),
+            -float((candidate.confidence or 0) + float((candidate.metadata or {}).get("quality_score") or 0)),
         ),
     )
     present_indexes = [
@@ -141,7 +132,16 @@ def resolve_field(
         repr(ordered[index].normalized_value)
         for index in present_indexes
     }
-    status = "conflicting" if len(distinct_values) > 1 else "resolved"
+    status = "resolved"
+    if len(distinct_values) > 1:
+        status = "conflicting"
+        if len(present_indexes) >= 2:
+            top = ordered[present_indexes[0]]
+            second = ordered[present_indexes[1]]
+            top_score = float(top.confidence or 0) + float((top.metadata or {}).get("quality_score") or 0)
+            second_score = float(second.confidence or 0) + float((second.metadata or {}).get("quality_score") or 0)
+            if abs(top_score - second_score) >= 0.2:
+                status = "resolved"
     return FieldRuntime(
         field_key=field_key,
         value=selected_value,
@@ -238,18 +238,28 @@ def _derive_fields(
     runtimes["vote_legal"] = _runtime("vote_legal", vote_legal, "inferred", "vote_rate_fields")
 
     explicit_vote = _value(runtimes, "has_vote_trace")
-    has_vote_trace = True if any(_value(runtimes, key) is not None for key in ("vote_total_households", "vote_approved_households", "vote_date")) else bool(explicit_vote)
-    runtimes["has_vote_trace"] = _runtime("has_vote_trace", has_vote_trace, "inferred", "vote_presence")
+    vote_start_date = _value(runtimes, "vote_start_date")
+    vote_end_date = _value(runtimes, "vote_end_date")
+    resolution_date = _value(runtimes, "resolution_date")
+    registration_date = _value(runtimes, "registration_date")
+    if vote_end_date:
+        vote_date = vote_end_date
+    elif vote_start_date:
+        vote_date = vote_start_date
+    elif registration_date:
+        vote_date = registration_date
+    else:
+        vote_date = resolution_date
+    runtimes["vote_date"] = _runtime("vote_date", vote_date, "inferred", "vote_start_date/vote_end_date/resolution_date/registration_date")
 
-    vote_date = _value(runtimes, "vote_date")
-    vote_date_source = ""
-    vote_runtime = runtimes.get("vote_date")
-    if vote_runtime and vote_runtime.selected_index >= 0 and vote_runtime.selected_index < len(vote_runtime.candidates):
-        vote_date_source = vote_runtime.candidates[vote_runtime.selected_index].source_column.lower()
-    vote_date_is_proxy = None if not vote_date else vote_date_source in PROXY_VOTE_DATE_FIELDS
-    runtimes["vote_date_is_proxy"] = _runtime("vote_date_is_proxy", vote_date_is_proxy, "inferred", "vote_date")
-    if vote_date_is_proxy:
-        warnings.append("当前 vote_date 来自征询/录入等代理日期字段，仅用于展示和弱校验。")
+    has_vote_trace = True if any(_value(runtimes, key) is not None for key in ("vote_total_households", "vote_approved_households", "vote_start_date", "vote_end_date", "resolution_date", "registration_date")) else bool(explicit_vote)
+    runtimes["has_vote_trace"] = _runtime("has_vote_trace", has_vote_trace, "inferred", "vote_presence")
+    vote_date_is_proxy = None
+    if vote_date:
+        vote_date_is_proxy = bool(vote_start_date or registration_date)
+        if vote_date_is_proxy:
+            warnings.append("当前表决关键日期来自征询开始/录入日期代替，建议人工复核。")
+    runtimes["vote_date_is_proxy"] = _runtime("vote_date_is_proxy", vote_date_is_proxy, "inferred", "vote_split_dates")
 
     is_before_vote = None
     if repair_nature == "normal":

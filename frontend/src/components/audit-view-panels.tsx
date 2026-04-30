@@ -13,6 +13,7 @@ import {
   TimerReset,
   WalletCards,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   AuditMaterialItem,
   AuditSourceType,
@@ -627,7 +628,12 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
   );
   const evidenceByField = Object.entries(fieldSources)
     .map(([fieldKey, sources]) => {
-      const sourceList = (sources || []).filter((source) => source.source_type === "pdf" || source.source_type === "excel");
+      const sourceList = (sources || [])
+        .filter((source) => source.source_type === "pdf" || source.source_type === "excel")
+        .filter((source, index, arr) => {
+          const key = `${fieldKey}|${String(source.file_name || "")}|${String(source.source_field || "")}|${String(source.value ?? "")}`;
+          return arr.findIndex((x) => `${fieldKey}|${String(x.file_name || "")}|${String(x.source_field || "")}|${String(x.value ?? "")}` === key) === index;
+        });
       return { fieldKey, sources: sourceList };
     })
     .filter((item) => item.sources.length > 0);
@@ -722,12 +728,12 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
                   标准值：{String((view.flat_standard_fields || {})[entry.fieldKey] ?? "未识别")}
                 </p>
                 <div className="mt-2 space-y-2">
-                  {entry.sources.map((source, index) => {
+                  {(entry.sources.filter((source) => source.value === (view.flat_standard_fields || {})[entry.fieldKey]).slice(0, 1)).map((source, index) => {
                     const metadata = (source.metadata || {}) as Record<string, unknown>;
                     return (
-                      <div key={`${entry.fieldKey}-${index}`} className="border-t border-white/5 pt-2">
+                      <div key={`${entry.fieldKey}-selected-${index}`} className="border-t border-white/5 pt-2">
                         <p className="break-words text-slate-300">
-                          来源：{String(source.file_name || "")}
+                          主来源：{String(source.file_name || "")}
                           {metadata.page ? ` / 第${String(metadata.page)}页` : ""}
                         </p>
                         <p className="break-words text-slate-500">
@@ -739,12 +745,102 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
                       </div>
                     );
                   })}
+                  <details className="rounded border border-white/5 p-2">
+                    <summary className="cursor-pointer text-slate-400">查看其他来源</summary>
+                    <div className="mt-2 space-y-2">
+                      {entry.sources.filter((source) => source.value !== (view.flat_standard_fields || {})[entry.fieldKey]).map((source, index) => {
+                        const metadata = (source.metadata || {}) as Record<string, unknown>;
+                        return (
+                          <div key={`${entry.fieldKey}-${index}`} className="border-t border-white/5 pt-2">
+                            <p className="break-words text-slate-300">
+                              来源：{String(source.file_name || "")}
+                              {metadata.page ? ` / 第${String(metadata.page)}页` : ""}
+                            </p>
+                            <p className="break-words text-slate-500">
+                              {metadata.raw_text ? `原文：${String(metadata.raw_text)}` : `原字段：${String(source.source_field || "")}`}
+                            </p>
+                            <p className="text-slate-500">
+                              置信度：{Math.round(Number(source.confidence || 0) * 100)}%
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </details>
                 </div>
               </div>
             ))}
           </div>
         </div>
       )}
+    </section>
+  );
+}
+
+export function ConflictConfirmPanel({ view }: { view: AuditView }) {
+  const conflicts = view.field_conflicts || [];
+  const fieldSources = view.field_sources || {};
+  const [manualValues, setManualValues] = useState<Record<string, string>>({});
+  const [selection, setSelection] = useState<Record<string, string>>({});
+  const [overrides, setOverrides] = useState<Array<Record<string, unknown>>>(view.user_overrides || []);
+  const sourceOptions = useMemo(
+    () =>
+      conflicts.map((conflict) => {
+        const key = String(conflict.field || "");
+        const sources = (fieldSources[key] || []).filter((s) => s.source_type === "pdf" || s.source_type === "excel");
+        return { key, sources };
+      }),
+    [conflicts, fieldSources],
+  );
+  if (conflicts.length === 0) return null;
+  return (
+    <section className="glass-card p-6">
+      <div className="mb-4 flex items-center gap-3">
+        <AlertTriangle className="h-5 w-5 text-amber-300" />
+        <div>
+          <h3 className="text-base font-bold text-white">冲突确认区</h3>
+          <p className="text-xs text-slate-500">仅展示冲突字段，支持 Excel/PDF/手动确认。</p>
+        </div>
+      </div>
+      <div className="space-y-4">
+        {conflicts.map((conflict, idx) => {
+          const fieldKey = String(conflict.field || "");
+          const options = sourceOptions[idx]?.sources || [];
+          return (
+            <div key={fieldKey} className="rounded-xl border border-amber-400/20 bg-amber-500/5 p-4 text-xs">
+              <p className="font-semibold text-amber-200">字段：{String(conflict.field_label || fieldKey)}</p>
+              <p className="mt-1 text-slate-400">系统推荐：{String(conflict.chosen_source || "unknown")}（分差 {String(conflict.score_gap ?? "-")}）</p>
+              <div className="mt-3 space-y-2">
+                {options.map((opt, i) => (
+                  <label key={`${fieldKey}-${i}`} className="flex items-center gap-2 text-slate-300">
+                    <input type="radio" name={`conflict-${fieldKey}`} checked={selection[fieldKey] === `source-${i}`} onChange={() => setSelection((prev) => ({ ...prev, [fieldKey]: `source-${i}` }))} />
+                    <span>{String(opt.source_type || "")}：{String(opt.value ?? "")}</span>
+                  </label>
+                ))}
+                <label className="flex items-center gap-2 text-slate-300">
+                  <input type="radio" name={`conflict-${fieldKey}`} checked={selection[fieldKey] === "manual"} onChange={() => setSelection((prev) => ({ ...prev, [fieldKey]: "manual" }))} />
+                  <span>手动输入：</span>
+                  <input className="rounded border border-white/20 bg-black/30 px-2 py-1 text-xs text-white" value={manualValues[fieldKey] || ""} onChange={(e) => setManualValues((prev) => ({ ...prev, [fieldKey]: e.target.value }))} />
+                </label>
+              </div>
+              <button
+                className="mt-3 rounded border border-amber-300/30 px-3 py-1 text-amber-200 hover:bg-amber-500/10"
+                onClick={() => {
+                  const selected = selection[fieldKey];
+                  const selectedValue = selected === "manual" ? manualValues[fieldKey] || "" : options[Number((selected || "source-0").split("-")[1])]?.value;
+                  setOverrides((prev) => [
+                    ...prev.filter((item) => String(item.field_key || "") !== fieldKey),
+                    { field_key: fieldKey, selected_value: selectedValue, selected_by: "user_override", selected_at: new Date().toISOString() },
+                  ]);
+                }}
+              >
+                确认
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {overrides.length > 0 && <p className="mt-3 text-xs text-slate-400">已记录 {overrides.length} 条人工确认（当前为前端会话态）。</p>}
     </section>
   );
 }
@@ -914,6 +1010,7 @@ export function AuditWorkspace({ view }: { view: AuditView }) {
         <TimelineTracePanel view={view} />
         <MaterialScanPanel view={view} />
       </div>
+      <ConflictConfirmPanel view={view} />
       <EvidenceExplorer view={view} />
       <PolicyMatchPanel view={view} />
       <AuditorNotesPanel view={view} />

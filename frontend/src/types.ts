@@ -110,6 +110,8 @@ export interface AuditView {
   flat_standard_fields?: Record<string, unknown>;
   field_sources?: Record<string, Array<Record<string, unknown>>>;
   material_evidence?: Array<Record<string, unknown>>;
+  field_conflicts?: Array<Record<string, unknown>>;
+  user_overrides?: Array<Record<string, unknown>>;
   timeline: AuditTimelineItem[];
   material_scan: AuditMaterialItem[];
   evidence_sections: {

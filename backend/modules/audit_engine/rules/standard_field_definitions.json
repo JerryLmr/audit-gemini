@@ -214,16 +214,60 @@
       "required_for_audit": false,
       "comment": "表决是否达到当前口径；字段不足时为 null，进入人工复核。"
     },
+    "vote_start_date": {
+      "field_name": "征询开始日期",
+      "field_key": "vote_start_date",
+      "category": "表决",
+      "type": "date|null",
+      "field_level": "原始事实",
+      "description": "征询或表决开始日期。",
+      "source_priority": ["pdf", "业主表决汇总.REQUEST_STARTDATE", "业主大会决议.发送征求意见表开始日期"],
+      "required_for_audit": false,
+      "comment": "征询开始日期，作为时序佐证字段。"
+    },
+    "vote_end_date": {
+      "field_name": "征询结束日期",
+      "field_key": "vote_end_date",
+      "category": "表决",
+      "type": "date|null",
+      "field_level": "原始事实",
+      "description": "征询或表决结束日期。",
+      "source_priority": ["业主表决汇总.REQUEST_ENDDATE", "业主大会决议.发送征求意见表结束日期", "pdf"],
+      "required_for_audit": false,
+      "comment": "征询结束日期，作为主表决时点。"
+    },
+    "resolution_date": {
+      "field_name": "决议生成日期",
+      "field_key": "resolution_date",
+      "category": "表决",
+      "type": "date|null",
+      "field_level": "原始事实",
+      "description": "决议形成日期。",
+      "source_priority": ["pdf", "业主大会决议.决议生成日期"],
+      "required_for_audit": false,
+      "comment": "决议形成日期，用于时序解释。"
+    },
+    "registration_date": {
+      "field_name": "录入日期",
+      "field_key": "registration_date",
+      "category": "表决",
+      "type": "date|null",
+      "field_level": "原始事实",
+      "description": "系统登记录入日期。",
+      "source_priority": ["业主表决汇总.REG_DATE", "pdf"],
+      "required_for_audit": false,
+      "comment": "登记录入日期，仅作辅助说明。"
+    },
     "vote_date": {
       "field_name": "表决日期",
       "field_key": "vote_date",
       "category": "表决",
       "type": "date|null",
-      "field_level": "原始事实",
-      "description": "表决日期，优先使用征询结束日期。",
-      "source_priority": ["pdf", "业主表决汇总.REQUEST_ENDDATE", "业主大会决议.发送征求意见表结束日期", "业主表决汇总.REQUEST_STARTDATE", "业主大会决议.发送征求意见表开始日期", "业主表决汇总.REG_DATE", "业主大会决议.决议生成日期"],
+      "field_level": "派生事实",
+      "description": "兼容旧规则的表决日期镜像字段。",
+      "source_priority": ["derived"],
       "required_for_audit": false,
-      "comment": "表决日期。优先使用 Hou_notion_sum.request_enddate；缺失时可用 request_startdate 或 reg_date 弱替代。"
+      "comment": "由 vote_end_date/vote_start_date/registration_date/resolution_date 推导，仅用于兼容旧规则。"
     },
     "vote_date_is_proxy": {
       "field_name": "表决日期是否代用",
