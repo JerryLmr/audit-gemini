@@ -58,6 +58,26 @@ export interface AiInterpretation {
   basis_fields: string[];
 }
 
+export interface PdfExtractionField {
+  field_key: string;
+  field_label: string;
+  value: unknown;
+  source_label: string;
+  raw_value: string;
+  confidence: number;
+  source_page: number;
+}
+
+export interface PdfExtractionEvidence {
+  file_name: string;
+  material_type: string;
+  material_type_label: string;
+  status: string;
+  status_label: string;
+  extracted_fields: PdfExtractionField[];
+  warnings: string[];
+}
+
 export interface PolicyMatch {
   policy_title: string;
   article: string;
@@ -94,6 +114,7 @@ export interface AuditView {
     structured_extraction: StructuredEvidence[];
     ai_interpretation: AiInterpretation[];
     low_confidence_candidates: AuditViewField[];
+    pdf_extraction?: PdfExtractionEvidence[];
   };
   policy_matches: PolicyMatch[];
   audit_cards: AuditCard[];

@@ -10,6 +10,7 @@
 backend/.venv/
 backend/.pytest_cache/
 backend/**/__pycache__/
+backend/modules/audit_engine/pdf
 *.pyc
 
 # Node (frontend)

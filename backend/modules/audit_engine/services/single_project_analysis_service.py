@@ -9,6 +9,8 @@ from fastapi import UploadFile
 from modules.audit_engine.services.audit_pipeline_service import run_audit_pipeline
 from modules.audit_engine.services.audit_view_builder import build_audit_view
 from modules.audit_engine.services.llm_field_classifier import classify_fields_with_local_llm
+from modules.audit_engine.services.pdf_material_parser import FIELD_LABELS as PDF_FIELD_LABELS
+from modules.audit_engine.services.pdf_material_parser import parse_pdf_material
 from modules.audit_engine.services.uploaded_file_parser import parse_uploaded_file
 
 
@@ -44,6 +46,16 @@ FIELD_LABELS = {
     "project_type": "项目类型",
     "repair_object": "维修对象",
     "mixed_scope_detected": "边界风险",
+    "consultation_date": "征询时间",
+    "resolution_no": "决议编号",
+    "vote_start_date": "征询开始日期",
+    "vote_end_date": "征询结束日期",
+}
+FIELD_LABELS.update(PDF_FIELD_LABELS)
+
+PDF_TO_STANDARD_FIELD = {
+    "consultation_date": "vote_date",
+    "decision_amount": "final_amount",
 }
 
 
@@ -186,9 +198,11 @@ def _structured_conflicts(raw_conflicts: List[Any], final_fields: Dict[str, Any]
                     "field_label": FIELD_LABELS.get(field_key, field_key or "字段"),
                     "parser_value": _display_value(item.get("parser_value")),
                     "llm_value": _display_value(item.get("llm_value")),
+                    "pdf_value": _display_value(item.get("pdf_value")),
                     "final_value": _display_value(item.get("final_value")),
-                    "reason": "保守采用 parser / 规则字段作为最终值。",
+                    "reason": item.get("reason") or "保守采用 parser / 规则字段作为最终值。",
                     "evidence": item.get("evidence") or "",
+                    "source_file": item.get("source_file") or "",
                 }
             )
             continue
@@ -227,6 +241,90 @@ def _attachment_item(file: UploadFile, *, used_for_audit: bool, status: str, mes
     }
 
 
+def _attachment_item_from_pdf(parsed_pdf: Dict[str, Any], *, used_for_audit: bool = False) -> Dict[str, Any]:
+    return {
+        "filename": parsed_pdf.get("filename") or "",
+        "content_type": "application/pdf",
+        "file_size": None,
+        "status": parsed_pdf.get("status") or "failed",
+        "used_for_audit": used_for_audit,
+        "message": parsed_pdf.get("message") or "",
+        "material_type": parsed_pdf.get("material_type") or "unknown_pdf",
+        "material_type_label": parsed_pdf.get("material_type_label") or "未识别PDF材料",
+    }
+
+
+def _normalize_compare_value(value: Any) -> Any:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return round(float(value), 6)
+    return value
+
+
+def merge_pdf_fields(standard_fields: Dict[str, Any], pdf_parse_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+    # PDF 只做证据增强与缺失补值，不覆盖 parser/Excel 已确认字段。
+    final_fields = deepcopy(standard_fields or {})
+    conflicts: List[Dict[str, Any]] = []
+    if not pdf_parse_results:
+        return {"final_fields": final_fields, "field_conflicts": conflicts}
+
+    for pdf in pdf_parse_results:
+        if pdf.get("status") != "parsed_pdf":
+            continue
+        source_file = str(pdf.get("filename") or "")
+        for raw_field_key, evidence in (pdf.get("extracted_fields") or {}).items():
+            if not isinstance(evidence, dict):
+                continue
+            pdf_value = evidence.get("normalized_value")
+            if pdf_value is None:
+                continue
+
+            field_key = PDF_TO_STANDARD_FIELD.get(raw_field_key, raw_field_key)
+            runtime = final_fields.setdefault(field_key, _empty_runtime(field_key))
+            if not isinstance(runtime, dict):
+                runtime = _empty_runtime(field_key)
+                final_fields[field_key] = runtime
+
+            candidate = {
+                "source_type": "pdf",
+                "source_file": source_file,
+                "source_sheet": "pdf",
+                "source_column": evidence.get("source_field") or raw_field_key,
+                "source_page": evidence.get("source_page"),
+                "raw_value": evidence.get("raw_value"),
+                "normalized_value": pdf_value,
+                "confidence": evidence.get("confidence") or 0.85,
+            }
+            runtime.setdefault("candidates", []).append(candidate)
+            pdf_index = len(runtime["candidates"]) - 1
+            parser_value = runtime.get("value")
+
+            if parser_value is None:
+                runtime["value"] = pdf_value
+                runtime["status"] = "pdf_extracted"
+                runtime["selected_index"] = pdf_index
+                continue
+
+            if _normalize_compare_value(parser_value) != _normalize_compare_value(pdf_value):
+                runtime["status"] = "conflicting"
+                conflicts.append(
+                    {
+                        "field": field_key,
+                        "field_label": FIELD_LABELS.get(field_key, field_key),
+                        "parser_value": parser_value,
+                        "pdf_value": pdf_value,
+                        "final_value": parser_value,
+                        "source_file": source_file,
+                        "reason": "Excel 与 PDF 字段不一致，保守采用 Excel/结构化字段作为最终值。",
+                    }
+                )
+
+    return {"final_fields": final_fields, "field_conflicts": conflicts}
+
+
 def _select_row(parsed_excel_files: List[Dict[str, Any]], warnings: List[str]) -> tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
     candidates: List[tuple[Dict[str, Any], Dict[str, Any]]] = []
     for file_result in parsed_excel_files:
@@ -252,6 +350,7 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
                 status="unsupported",
                 message="未上传文件。",
                 attachments=[],
+                pdf_parse_results=[],
                 warnings=["未上传文件。"],
             )
         }
@@ -259,6 +358,7 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
     warnings: List[str] = []
     attachments: List[Dict[str, Any]] = []
     parsed_excel_files: List[Dict[str, Any]] = []
+    pdf_parse_results: List[Dict[str, Any]] = []
 
     for upload in file_list:
         filename = upload.filename or ""
@@ -280,7 +380,23 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
             continue
 
         if _is_pdf(filename):
-            attachments.append(_attachment_item(upload, used_for_audit=False, status="attached", message="PDF 已接收，本期仅附件展示。"))
+            try:
+                content = await upload.read()
+                parsed_pdf = parse_pdf_material(filename, content)
+            except Exception as exc:
+                parsed_pdf = {
+                    "filename": filename,
+                    "status": "failed",
+                    "message": f"PDF 解析失败：{exc}",
+                    "material_type": "unknown_pdf",
+                    "material_type_label": "未识别PDF材料",
+                    "extracted_fields": {},
+                    "evidence_snippets": [],
+                    "warnings": [str(exc)],
+                }
+            pdf_parse_results.append(parsed_pdf)
+            attachments.append(_attachment_item_from_pdf(parsed_pdf))
+            warnings.extend(parsed_pdf.get("warnings") or [])
             continue
 
         attachments.append(_attachment_item(upload, used_for_audit=False, status="ignored", message="当前仅 Excel 参与审计。"))
@@ -293,6 +409,7 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
                 status="unsupported",
                 message="未检测到可用于审计的 Excel 文件。",
                 attachments=attachments,
+                pdf_parse_results=pdf_parse_results,
                 llm_result={"available": False, "error_message": "无可审计 Excel"},
                 warnings=warnings,
             )
@@ -305,6 +422,7 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
                 status="manual_review",
                 message="Excel 文件未解析到可审计项目。",
                 attachments=attachments,
+                pdf_parse_results=pdf_parse_results,
                 llm_result={"available": False, "error_message": "无可审计项目"},
                 warnings=warnings + ["Excel 文件未解析到可审计项目。"],
             )
@@ -320,11 +438,12 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
             item["status"] = "used_for_audit"
             break
 
-    raw_fields = _raw_fields_from_standard_fields(row.get("standard_fields") or {})
+    merged_pdf = merge_pdf_fields(row.get("standard_fields") or {}, pdf_parse_results)
+    raw_fields = _raw_fields_from_standard_fields(merged_pdf["final_fields"] or {})
     raw_text = _raw_text_from_row(row)
     llm_result = classify_fields_with_local_llm(raw_fields, raw_text)
-    merged = merge_llm_fields(row.get("standard_fields") or {}, llm_result)
-    field_conflicts = list(row.get("conflicting_fields") or []) + merged["field_conflicts"]
+    merged = merge_llm_fields(merged_pdf["final_fields"] or {}, llm_result)
+    field_conflicts = list(row.get("conflicting_fields") or []) + list(merged_pdf["field_conflicts"] or []) + merged["field_conflicts"]
     structured_conflicts = _structured_conflicts(field_conflicts, merged["final_fields"])
 
     final_request = dict(row.get("audit_request") or {})
@@ -339,12 +458,15 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
         warnings.append("本地 LLM 不可用，已跳过 AI 字段归类。")
     if field_conflicts:
         warnings.append("存在 parser 与 LLM 或多来源字段冲突，建议人工复核。")
+    if merged_pdf["field_conflicts"]:
+        warnings.append("Excel 与 PDF 字段存在冲突，建议人工复核。")
 
     audit_result = run_audit_pipeline(final_request)
     return {
         "audit_view": build_audit_view(
             status="analyzed",
             attachments=attachments,
+            pdf_parse_results=pdf_parse_results,
             standard_fields=merged["final_fields"],
             source_sheets=row.get("source_sheets") or [],
             llm_result=llm_result,

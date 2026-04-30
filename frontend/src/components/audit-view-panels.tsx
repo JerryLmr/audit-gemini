@@ -620,6 +620,7 @@ export function MaterialScanPanel({ view }: { view: AuditView }) {
 }
 
 export function EvidenceExplorer({ view }: { view: AuditView }) {
+  const pdfExtraction = view.evidence_sections.pdf_extraction || [];
   return (
     <section className="glass-card p-6">
       <div className="mb-5 flex items-center gap-3">
@@ -697,6 +698,36 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
           </div>
         </div>
       </div>
+      {pdfExtraction.length > 0 && (
+        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+          <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
+            <FileText className="h-4 w-4 text-cyan-300" />
+            PDF材料佐证
+          </h4>
+          <div className="space-y-4">
+            {pdfExtraction.map((pdf) => (
+              <div key={pdf.file_name} className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs">
+                <p className="break-words font-semibold text-slate-100">{pdf.file_name}</p>
+                <p className="mt-1 text-slate-400">
+                  {pdf.material_type_label} · {pdf.status_label}
+                </p>
+                <div className="mt-2 space-y-2">
+                  {pdf.extracted_fields.map((field) => (
+                    <div key={`${pdf.file_name}-${field.field_key}-${field.source_page}`} className="border-t border-white/5 pt-2">
+                      <p className="text-slate-200">
+                        {field.field_label}：{String(field.value)}
+                      </p>
+                      <p className="break-words text-slate-500">来源：{field.source_label}</p>
+                      <p className="break-words text-slate-500">原文：{field.raw_value}</p>
+                      <p className="text-slate-500">置信度：{Math.round(field.confidence * 100)}%</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

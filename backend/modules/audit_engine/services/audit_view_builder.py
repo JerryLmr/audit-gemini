@@ -8,6 +8,7 @@ from modules.audit_engine.core.field_resolver import runtime_values
 SOURCE_TYPE_LABELS = {
     "excel": "original",
     "llm": "extracted",
+    "pdf": "extracted",
     "derived": "inferred",
 }
 
@@ -314,34 +315,71 @@ def _material_source(active_excel_filename: str, sheet_name: Optional[str]) -> s
     return f"{active_excel_filename} / {sheet_name}" if active_excel_filename else sheet_name
 
 
-def _material_scan(standard_fields: Dict[str, Any], source_sheets: List[str], attachments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _pdf_material_hit(pdf_parse_results: List[Dict[str, Any]], material_type: str) -> Optional[Dict[str, Any]]:
+    for item in pdf_parse_results or []:
+        if item.get("status") == "parsed_pdf" and item.get("material_type") == material_type:
+            return item
+    return None
+
+
+def _pdf_source_label(item: Dict[str, Any]) -> str:
+    return f"{item.get('filename') or ''} / 第1页 / {item.get('material_type_label') or 'PDF材料'}"
+
+
+def _pdf_evidence_summary(item: Dict[str, Any]) -> str:
+    labels = []
+    for field_key, evidence in (item.get("extracted_fields") or {}).items():
+        if isinstance(evidence, dict) and evidence.get("normalized_value") is not None:
+            labels.append(FIELD_LABELS.get(field_key, field_key))
+    labels = labels[:3]
+    if not labels:
+        return "已识别PDF材料类型。"
+    return f"从 PDF 中识别到{'、'.join(labels)}。"
+
+
+def _material_scan(
+    standard_fields: Dict[str, Any],
+    source_sheets: List[str],
+    attachments: List[Dict[str, Any]],
+    pdf_parse_results: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
     need_cost_review = _bool_value(standard_fields, "need_cost_review") is True
     final_amount_present = _present(_value(standard_fields.get("final_amount")))
     active_excel_filename = _active_excel_filename(attachments)
 
     rows = [
-        ("维修工单", _present_sheet(source_sheets, ["维修工单"]), "建议补充维修工单或报修登记材料。", True),
-        ("维修预案", _present_sheet(source_sheets, ["维修预案", "维修决案"]), "建议补充维修预案、维修决案或实施方案材料。", True),
-        ("业主征询意见/表决汇总", _present_sheet(source_sheets, ["业主征询意见", "业主表决汇总"]), "建议补充业主征询意见或表决汇总材料。", True),
-        ("业主大会决议", _present_sheet(source_sheets, ["业主大会决议"]), "建议补充业主大会/业委会决议材料。", True),
-        ("施工合同", _present_sheet(source_sheets, ["施工合同表"]) if _bool_value(standard_fields, "has_construction_contract") is True or _has_sheet(source_sheets, ["施工合同表"]) else None, "建议补充施工合同或中标/委托文件。", True),
-        ("审价合同", _present_sheet(source_sheets, ["审价合同"]) if _bool_value(standard_fields, "has_appraisal_contract") is True else None, "建议补充审价合同或造价咨询委托材料。", need_cost_review),
-        ("审价报告", _present_sheet(source_sheets, ["审价报告", "预算审核报告"]) if _bool_value(standard_fields, "has_appraisal_report") is True else None, "建议补充审价报告或预算审核报告。", need_cost_review),
-        ("验收/完工报告", _present_sheet(source_sheets, ["项目完工报告表", "验收报告", "完工报告"]), "建议补充完工验收材料。", final_amount_present),
+        ("维修工单", _present_sheet(source_sheets, ["维修工单"]), None, "建议补充维修工单或报修登记材料。", True),
+        ("维修预案", _present_sheet(source_sheets, ["维修预案", "维修决案"]), _pdf_material_hit(pdf_parse_results, "repair_plan_pdf"), "建议补充维修预案、维修决案或实施方案材料。", True),
+        ("业主征询意见/表决汇总", _present_sheet(source_sheets, ["业主征询意见", "业主表决汇总"]), _pdf_material_hit(pdf_parse_results, "vote_summary_pdf"), "建议补充业主征询意见或表决汇总材料。", True),
+        ("业主大会决议", _present_sheet(source_sheets, ["业主大会决议"]), _pdf_material_hit(pdf_parse_results, "resolution_pdf"), "建议补充业主大会/业委会决议材料。", True),
+        ("维修工程实施方案", _present_sheet(source_sheets, ["维修预案", "维修决案"]), _pdf_material_hit(pdf_parse_results, "implementation_plan_pdf"), "建议补充维修工程实施方案。", True),
+        ("施工合同", _present_sheet(source_sheets, ["施工合同表"]) if _bool_value(standard_fields, "has_construction_contract") is True or _has_sheet(source_sheets, ["施工合同表"]) else None, None, "建议补充施工合同或中标/委托文件。", True),
+        ("审价合同", _present_sheet(source_sheets, ["审价合同"]) if _bool_value(standard_fields, "has_appraisal_contract") is True else None, None, "建议补充审价合同或造价咨询委托材料。", need_cost_review),
+        ("审价报告", _present_sheet(source_sheets, ["审价报告", "预算审核报告"]) if _bool_value(standard_fields, "has_appraisal_report") is True else None, None, "建议补充审价报告或预算审核报告。", need_cost_review),
+        ("验收/完工报告", _present_sheet(source_sheets, ["项目完工报告表", "验收报告", "完工报告"]), None, "建议补充完工验收材料。", final_amount_present),
     ]
     output = []
-    for name, sheet_name, remediation, affects_audit in rows:
-        status = "extracted" if sheet_name else ("missing" if affects_audit else "not_applicable")
+    for name, sheet_name, pdf_item, remediation, affects_audit in rows:
+        status = "extracted" if (sheet_name or pdf_item) else ("missing" if affects_audit else "not_applicable")
+        if sheet_name:
+            source_label = _material_source(active_excel_filename, sheet_name)
+            evidence_summary = f"已识别{name}相关材料。"
+        elif pdf_item:
+            source_label = _pdf_source_label(pdf_item)
+            evidence_summary = _pdf_evidence_summary(pdf_item)
+        else:
+            source_label = "未识别"
+            evidence_summary = f"当前材料未识别{name}。"
         output.append(
             {
                 "required_item": name,
                 "status": status,
                 "status_label": {"extracted": "已识别", "missing": "缺失", "partial": "部分识别", "not_applicable": "不适用"}[status],
-                "source_label": _material_source(active_excel_filename, sheet_name),
-                "evidence_summary": f"已识别{name}相关材料。" if sheet_name else f"当前材料未识别{name}。",
+                "source_label": source_label,
+                "evidence_summary": evidence_summary,
                 "affects_audit": bool(affects_audit),
-                "remediation": "" if sheet_name or not affects_audit else remediation,
-                "confidence": 0.9 if sheet_name else (0 if affects_audit else 0.4),
+                "remediation": "" if (sheet_name or pdf_item) or not affects_audit else remediation,
+                "confidence": 0.9 if (sheet_name or pdf_item) else (0 if affects_audit else 0.4),
             }
         )
     return output
@@ -370,12 +408,55 @@ def _raw_materials(attachments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         {
             "file_name": item.get("filename") or "",
             "file_type": _file_type(item.get("filename") or ""),
-            "recognized": item.get("status") in {"parsed", "used_for_audit", "attached"},
-            "role": _material_role(item.get("filename") or "", item.get("used_for_audit") is True),
+            "recognized": item.get("status") in {"parsed", "used_for_audit", "parsed_pdf", "scan_or_unreadable", "unrecognized_pdf"},
+            "role": item.get("material_type_label") or _material_role(item.get("filename") or "", item.get("used_for_audit") is True),
             "status": item.get("status") or "",
         }
         for item in attachments
     ]
+
+
+def _pdf_extraction(pdf_parse_results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    output: List[Dict[str, Any]] = []
+    for item in pdf_parse_results or []:
+        extracted_fields = []
+        for field_key, evidence in (item.get("extracted_fields") or {}).items():
+            if not isinstance(evidence, dict):
+                continue
+            if evidence.get("normalized_value") is None:
+                continue
+            page = evidence.get("source_page") or 1
+            extracted_fields.append(
+                {
+                    "field_key": field_key,
+                    "field_label": FIELD_LABELS.get(field_key, field_key),
+                    "value": evidence.get("normalized_value"),
+                    "source_label": f"{item.get('filename') or ''} / 第{page}页",
+                    "raw_value": evidence.get("raw_value"),
+                    "confidence": float(evidence.get("confidence") or 0.8),
+                    "source_page": page,
+                }
+            )
+
+        status = item.get("status") or "failed"
+        status_label = "已解析"
+        if status == "scan_or_unreadable":
+            status_label = "扫描件/不可读"
+        elif status in {"unrecognized_pdf", "failed"}:
+            status_label = "未识别/失败"
+
+        output.append(
+            {
+                "file_name": item.get("filename") or "",
+                "material_type": item.get("material_type") or "unknown_pdf",
+                "material_type_label": item.get("material_type_label") or "未识别PDF材料",
+                "status": status,
+                "status_label": status_label,
+                "extracted_fields": extracted_fields,
+                "warnings": item.get("warnings") or [],
+            }
+        )
+    return output
 
 
 def _structured_extraction(standard_fields: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -586,15 +667,18 @@ def build_audit_view(
     audit_result: Optional[Dict[str, Any]] = None,
     warnings: Optional[List[str]] = None,
     field_conflicts: Optional[List[Dict[str, Any]]] = None,
+    pdf_parse_results: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     standard_fields = standard_fields or {}
     attachments = attachments or []
     source_sheets = source_sheets or []
     llm_result = llm_result or {}
     audit_result = audit_result or {}
-    material_scan = _material_scan(standard_fields, source_sheets, attachments)
+    pdf_parse_results = pdf_parse_results or []
+    material_scan = _material_scan(standard_fields, source_sheets, attachments, pdf_parse_results)
     structured, low_confidence = _structured_extraction(standard_fields)
     policy_matches = _policy_matches(audit_result)
+    pdf_extraction = _pdf_extraction(pdf_parse_results)
     return {
         "display_conclusion": _display_conclusion(audit_result, standard_fields, material_scan)
         if standard_fields
@@ -612,6 +696,7 @@ def build_audit_view(
             "structured_extraction": structured,
             "ai_interpretation": _ai_interpretation(standard_fields, llm_result, material_scan) if standard_fields else [],
             "low_confidence_candidates": low_confidence,
+            "pdf_extraction": pdf_extraction,
         },
         "policy_matches": policy_matches,
         "audit_cards": _audit_cards(audit_result, material_scan) if audit_result else [],
