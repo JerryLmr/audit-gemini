@@ -64,16 +64,16 @@ def _material_type(filename: str, text: str) -> str:
     return "unknown_pdf"
 
 
+def _label_re(label: str) -> str:
+    return rf"{re.escape(label)}\s*[：:]?\s*"
+
+
 def _extract_between(text: str, start: str, end: str) -> Optional[str]:
-    start_idx = text.find(start)
-    if start_idx < 0:
+    pattern = re.compile(rf"{_label_re(start)}(.*?)(?={_label_re(end)})", flags=re.S)
+    match = pattern.search(text or "")
+    if not match:
         return None
-    part = text[start_idx + len(start) :]
-    part = re.sub(r"^[：:\s　]+", "", part)
-    end_idx = part.find(end)
-    if end_idx >= 0:
-        part = part[:end_idx]
-    value = normalize_whitespace(part)
+    value = normalize_whitespace(match.group(1))
     return value or None
 
 
@@ -90,7 +90,7 @@ def _evidence(raw_field: str, label: str, value: Any, page: int, raw_text: str, 
 
 def _find_line_value(page_text: str, keys: List[str], label: str, raw_field: str, parser, confidence: float) -> Optional[Dict[str, Any]]:
     for key in keys:
-        m = re.search(rf"{re.escape(key)}\s*[：:]\s*([^\n]+)", page_text)
+        m = re.search(rf"{_label_re(key)}([^\n]+)", page_text)
         if not m:
             continue
         raw = normalize_whitespace(m.group(1))
@@ -131,12 +131,13 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
         result["material_type_label"] = MATERIAL_TYPE_LABELS.get(material_type, MATERIAL_TYPE_LABELS["unknown_pdf"])
 
         evidence: List[Dict[str, Any]] = []
-        page1 = normalize_whitespace(pages[0] if pages else "")
+        raw_page1 = pages[0] if pages else ""
+        normalized_page1 = normalize_whitespace(raw_page1)
 
-        common_project = _find_line_value(page1, ["工程名称", "项目名称"], "工程名称", "project_name", None, 0.9)
+        common_project = _find_line_value(raw_page1, ["工程名称", "项目名称"], "工程名称", "project_name", None, 0.9)
         if common_project:
             evidence.append(common_project)
-        common_print = _find_line_value(page1, ["打印日期"], "打印日期", "print_date", _to_date, 0.88)
+        common_print = _find_line_value(raw_page1, ["打印日期"], "打印日期", "print_date", _to_date, 0.88)
         if common_print:
             evidence.append(common_print)
 
@@ -151,7 +152,7 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
                 ("management_unit", "施工管理单位", "施工管理单位", "根据《上海市住宅物业管理规定》"),
             ]
             for key, label, start, end in spans:
-                raw = _extract_between(page1, start, end)
+                raw = _extract_between(raw_page1, start, end)
                 if raw is None:
                     continue
                 value: Any = _to_amount(raw) if key == "budget_amount" else raw
@@ -160,16 +161,16 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
                 evidence.append(_evidence(key, label, value, 1, f"{label}: {raw}", 0.85))
         elif material_type == "implementation_plan_pdf":
             for item in [
-                _find_line_value(page1, ["决案总金额", "决案金额"], "决案总金额", "final_amount", _to_amount, 0.86),
-                _find_line_value(page1, ["维修设施设备名称"], "维修设施设备名称", "repair_object", None, 0.85),
+                _find_line_value(raw_page1, ["决案总金额", "决案金额"], "决案总金额", "final_amount", _to_amount, 0.86),
+                _find_line_value(raw_page1, ["维修设施设备名称"], "维修设施设备名称", "repair_object", None, 0.85),
             ]:
                 if item:
                     evidence.append(item)
         elif material_type == "vote_summary_pdf":
             for item in [
-                _find_line_value(page1, ["征询时间", "表决时间"], "征询时间", "vote_date", _to_date, 0.86),
-                _find_line_value(page1, ["同意票数比例"], "同意票数比例", "agree_count_rate", _to_percent, 0.8),
-                _find_line_value(page1, ["同意面积比例"], "同意面积比例", "agree_area_rate", _to_percent, 0.8),
+                _find_line_value(raw_page1, ["征询时间", "表决时间"], "征询时间", "vote_date", _to_date, 0.86),
+                _find_line_value(raw_page1, ["同意票数比例"], "同意票数比例", "agree_count_rate", _to_percent, 0.8),
+                _find_line_value(raw_page1, ["同意面积比例"], "同意面积比例", "agree_area_rate", _to_percent, 0.8),
             ]:
                 if item:
                     evidence.append(item)
@@ -177,19 +178,19 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
                 evidence.append(_evidence("vote_passed", "是否通过", True, 1, "表决通过", 0.78))
         elif material_type == "resolution_pdf":
             for item in [
-                _find_line_value(page1, ["编号", "决议编号"], "编号", "resolution_no", None, 0.84),
-                _find_line_value(page1, ["征询开始日期", "发送征求意见表开始日期"], "征询开始日期", "vote_start_date", _to_date, 0.86),
-                _find_line_value(page1, ["征询结束日期", "发送征求意见表结束日期"], "征询结束日期", "vote_end_date", _to_date, 0.86),
-                _find_line_value(page1, ["原维修资金预算金额", "预算金额"], "原维修资金预算金额", "budget_amount", _to_amount, 0.86),
-                _find_line_value(page1, ["工程决案总金额", "决案总金额"], "工程决案总金额", "final_amount", _to_amount, 0.86),
+                _find_line_value(raw_page1, ["编号", "决议编号"], "编号", "resolution_no", None, 0.84),
+                _find_line_value(raw_page1, ["征询开始日期", "发送征求意见表开始日期"], "征询开始日期", "vote_start_date", _to_date, 0.86),
+                _find_line_value(raw_page1, ["征询结束日期", "发送征求意见表结束日期"], "征询结束日期", "vote_end_date", _to_date, 0.86),
+                _find_line_value(raw_page1, ["原维修资金预算金额", "预算金额"], "原维修资金预算金额", "budget_amount", _to_amount, 0.86),
+                _find_line_value(raw_page1, ["工程决案总金额", "决案总金额"], "工程决案总金额", "final_amount", _to_amount, 0.86),
             ]:
                 if item:
                     evidence.append(item)
-            if "业主大会公章" in normalized:
+            if "业主大会公章" in normalized_page1:
                 evidence.append(_evidence("has_owner_meeting_seal", "业主大会公章", True, 1, "业主大会公章", 0.8))
-            if "主任" in normalized:
+            if "主任" in normalized_page1:
                 evidence.append(_evidence("director_signed", "主任签章", True, 1, "主任签章", 0.78))
-            if "副主任" in normalized:
+            if "副主任" in normalized_page1:
                 evidence.append(_evidence("deputy_director_signed", "副主任签章", True, 1, "副主任签章", 0.78))
 
         result["raw_evidence"] = evidence

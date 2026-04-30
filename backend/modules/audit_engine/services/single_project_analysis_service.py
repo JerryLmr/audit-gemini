@@ -191,9 +191,19 @@ def _build_field_sources(standard_fields: Dict[str, Any]) -> Dict[str, List[Dict
         if not isinstance(runtime, dict):
             continue
         sources = []
+        seen = set()
         for c in runtime.get("candidates") or []:
             if not isinstance(c, dict):
                 continue
+            dedupe_key = (
+                field_key,
+                str(c.get("source_file") or ""),
+                str(c.get("source_column") or ""),
+                repr(c.get("normalized_value")),
+            )
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
             sources.append(
                 {
                     "source_type": c.get("source_type"),
@@ -232,6 +242,23 @@ def _build_structured_conflicts(standard_fields: Dict[str, Any]) -> List[Dict[st
             }
         )
     return conflicts
+
+
+def _dedupe_material_evidence(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    output: List[Dict[str, Any]] = []
+    seen = set()
+    for item in items or []:
+        key = (
+            str(item.get("standard_field") or ""),
+            str(item.get("file_name") or ""),
+            str(item.get("raw_field") or ""),
+            repr(item.get("value")),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        output.append(item)
+    return output
 
 
 async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, Any]:
@@ -273,7 +300,7 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
                 warnings=warnings,
                 flat_standard_fields={},
                 field_sources={},
-                material_evidence=pdf_mapped["material_evidence"],
+                material_evidence=_dedupe_material_evidence(pdf_mapped["material_evidence"]),
                 field_conflicts=[],
             )
         }
@@ -323,6 +350,6 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
             field_conflicts=field_conflicts,
             flat_standard_fields=runtime_values(merged["final_fields"]),
             field_sources=_build_field_sources(merged["final_fields"]),
-            material_evidence=pdf_mapped["material_evidence"],
+            material_evidence=_dedupe_material_evidence(pdf_mapped["material_evidence"]),
         )
     }

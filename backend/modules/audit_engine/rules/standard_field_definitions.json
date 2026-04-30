@@ -16,7 +16,7 @@
       "description": "工程名称，用于项目本体合规判断和目录映射。",
       "llm_extractable": true,
       "allow_inference": false,
-      "source_priority": ["pdf", "维修工程信息", "维修决案", "维修预案", "维修对象", "text"],
+      "source_priority": ["维修工程信息", "维修决案", "维修预案", "维修对象", "text"],
       "required_for_audit": true,
       "comment": "工程名称，用于项目本体合规判断和目录映射。"
     },
@@ -49,7 +49,7 @@
       "type": "boolean",
       "field_level": "派生事实",
       "description": "property 是否属于当前支持范围。",
-      "source_priority": ["pdf", "derived"],
+      "source_priority": ["derived"],
       "required_for_audit": true,
       "comment": "property 是否属于当前支持范围；非法值不得静默当普通维修处理。"
     },
@@ -60,7 +60,7 @@
       "type": "boolean|null",
       "field_level": "派生事实",
       "description": "是否紧急维修；由 property 原始值推导。",
-      "source_priority": ["pdf", "derived"],
+      "source_priority": ["derived"],
       "required_for_audit": true,
       "comment": "是否紧急维修；当前版本仅区分普通维修和紧急维修。"
     },
@@ -342,7 +342,7 @@
       "type": "number|null",
       "field_level": "原始事实",
       "description": "预算金额，仅用于金额与造价信息展示。",
-      "source_priority": ["pdf", "三审工程维修项目表", "维修决案", "维修预案", "维修工程信息"],
+      "source_priority": ["三审工程维修项目表", "维修决案", "维修预案", "维修工程信息"],
       "required_for_audit": false,
       "comment": "预算金额，仅用于金额与造价信息展示。"
     },
