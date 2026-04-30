@@ -131,9 +131,7 @@ def _raw_fields_from_standard_fields(standard_fields: Dict[str, Any]) -> Dict[st
 
 
 def _external_flat_fields(standard_fields: Dict[str, Any]) -> Dict[str, Any]:
-    values = runtime_values(standard_fields)
-    values.pop("vote_date", None)
-    return values
+    return runtime_values(standard_fields)
 
 
 def _raw_text_from_row(row: Dict[str, Any], standard_fields: Dict[str, Any]) -> str:
@@ -207,6 +205,7 @@ def _build_field_sources(standard_fields: Dict[str, Any]) -> Dict[str, List[Dict
             dedupe_key = (
                 field_key,
                 str(c.get("source_file") or ""),
+                str(c.get("source_sheet") or ""),
                 str(c.get("source_column") or ""),
                 repr(c.get("normalized_value")),
             )
@@ -269,23 +268,6 @@ def _build_structured_conflicts(standard_fields: Dict[str, Any]) -> List[Dict[st
     return conflicts
 
 
-def _dedupe_material_evidence(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    output: List[Dict[str, Any]] = []
-    seen = set()
-    for item in items or []:
-        key = (
-            str(item.get("standard_field") or ""),
-            str(item.get("file_name") or ""),
-            str(item.get("raw_field") or ""),
-            repr(item.get("value")),
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        output.append(item)
-    return output
-
-
 async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, Any]:
     file_list = list(files)
     if not file_list:
@@ -325,7 +307,6 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
                 warnings=warnings,
                 flat_standard_fields={},
                 field_sources={},
-                material_evidence=_dedupe_material_evidence(pdf_mapped["material_evidence"]),
                 field_conflicts=[],
                 user_overrides=[],
             )
@@ -376,7 +357,6 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
             field_conflicts=field_conflicts,
             flat_standard_fields=_external_flat_fields(merged["final_fields"]),
             field_sources=_build_field_sources(merged["final_fields"]),
-            material_evidence=_dedupe_material_evidence(pdf_mapped["material_evidence"]),
             user_overrides=[],
         )
     }

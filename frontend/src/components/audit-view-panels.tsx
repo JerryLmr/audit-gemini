@@ -630,8 +630,8 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
       const sourceList = (sources || [])
         .filter((source) => source.source_type === "pdf" || source.source_type === "excel" || source.source_type === "derived" || source.source_type === "manual_input")
         .filter((source, index, arr) => {
-          const key = `${fieldKey}|${String(source.file_name || "")}|${String(source.source_field || "")}|${String(source.value ?? "")}`;
-          return arr.findIndex((x) => `${fieldKey}|${String(x.file_name || "")}|${String(x.source_field || "")}|${String(x.value ?? "")}` === key) === index;
+          const key = `${fieldKey}|${String(source.file_name || "")}|${String(source.source_sheet || "")}|${String(source.source_field || "")}|${String(source.value ?? "")}`;
+          return arr.findIndex((x) => `${fieldKey}|${String(x.file_name || "")}|${String(x.source_sheet || "")}|${String(x.source_field || "")}|${String(x.value ?? "")}` === key) === index;
         });
       return { fieldKey, sources: sourceList };
     })
@@ -836,7 +836,7 @@ export function ConflictConfirmPanel({
         const key = String(conflict.field || "");
         const sources = (fieldSources[key] || [])
           .filter((s) => s.source_type === "pdf" || s.source_type === "excel")
-          .filter((s, i, arr) => arr.findIndex((x) => `${String(x.file_name || "")}|${String(x.source_field || "")}|${String(x.value ?? "")}` === `${String(s.file_name || "")}|${String(s.source_field || "")}|${String(s.value ?? "")}`) === i);
+          .filter((s, i, arr) => arr.findIndex((x) => `${String(x.file_name || "")}|${String(x.source_sheet || "")}|${String(x.source_field || "")}|${String(x.value ?? "")}` === `${String(s.file_name || "")}|${String(s.source_sheet || "")}|${String(s.source_field || "")}|${String(s.value ?? "")}`) === i);
         const numeric = sources.filter((s) => typeof s.value === "number").map((s) => Number(s.value));
         const hasNonZero = numeric.some((v) => v !== 0);
         const filtered = hasNonZero ? sources.filter((s) => !(typeof s.value === "number" && Number(s.value) === 0)) : sources;
@@ -881,13 +881,14 @@ export function ConflictConfirmPanel({
                 onClick={() => {
                   const selected = selection[fieldKey];
                   const selectedValue = selected === "manual" ? manualValues[fieldKey] || "" : options[Number((selected || "source-0").split("-")[1])]?.value;
-                  const sourceName = selected === "manual" ? "手动输入" : String(options[Number((selected || "source-0").split("-")[1])]?.source_type || "");
+                  const sourceType = String(options[Number((selected || "source-0").split("-")[1])]?.source_type || "");
+                  const sourceName = selected === "manual" ? "手动输入" : sourceType === "excel" ? "Excel" : sourceType === "pdf" ? "PDF" : sourceType;
                   setOverrides((prev) => [
                     ...prev.filter((item) => String(item.field_key || "") !== fieldKey),
                     { field_key: fieldKey, selected_value: selectedValue, selected_by: "user_override", selected_at: new Date().toISOString() },
                   ]);
                   onConfirm?.(fieldKey, selectedValue);
-                  setFeedback(`已采用 ${String(conflict.field_label || fieldKey)}：${sourceName}`);
+                  setFeedback(`已采用：${sourceName}（${String(conflict.field_label || fieldKey)}）`);
                 }}
               >
                 确认

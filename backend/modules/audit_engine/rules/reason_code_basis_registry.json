@@ -340,14 +340,14 @@
         "issuer": "",
         "document_no": "",
         "article": "",
-        "section": "已由 PROCESS_VOTE_DATE_MISSING / PROCESS_CONSTRUCTION_BEFORE_VOTE_CONFIRMED 替代",
+        "section": "已由 PROCESS_VOTE_END_DATE_MISSING / PROCESS_CONSTRUCTION_BEFORE_VOTE_CONFIRMED 替代",
         "basis_strength": "weak",
         "current_four_layer_used": false,
         "deprecated": true,
         "primary": true
       }
     ],
-    "PROCESS_VOTE_DATE_MISSING": [
+    "PROCESS_VOTE_END_DATE_MISSING": [
       {
         "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
         "source_type": "regulation",
@@ -356,7 +356,7 @@
         "document_no": "建设部、财政部令第165号",
         "article": "第二十二条、第二十三条",
         "section": "普通维修表决时序校验背景依据",
-        "basis_explanation": "维修资金使用应履行表决程序；当前缺少表决日期，无法完成流程时序校验，建议补充核验。",
+        "basis_explanation": "维修资金使用应履行表决程序；当前缺少征询结束日期，无法完成流程时序校验，建议补充核验。",
         "basis_strength": "weak",
         "primary": true
       }
@@ -371,20 +371,6 @@
         "article": "第二十二条、第二十三条",
         "section": "普通维修表决程序时序复核背景依据",
         "basis_explanation": "维修资金使用应履行表决程序；当前发现施工时间早于表决时间，建议核查流程合规性。",
-        "basis_strength": "weak",
-        "primary": true
-      }
-    ],
-    "PROCESS_VOTE_DATE_PROXY_USED": [
-      {
-        "display_name": "《住宅专项维修资金管理办法》（建设部、财政部令第165号）第二十二条、第二十三条",
-        "source_type": "regulation",
-        "title": "住宅专项维修资金管理办法",
-        "issuer": "建设部、财政部",
-        "document_no": "建设部、财政部令第165号",
-        "article": "第二十二条、第二十三条",
-        "section": "表决日期代用字段背景提示",
-        "basis_explanation": "普通维修资金使用应履行表决程序；当前 vote_date 使用征询日期或录入日期代替，仅用于展示和弱校验。",
         "basis_strength": "weak",
         "primary": true
       }

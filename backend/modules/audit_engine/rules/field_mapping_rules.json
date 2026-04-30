@@ -136,22 +136,6 @@
       "mapping_rule": "户数和面积通过率均达到三分之二时为 true；任一无法计算时为 null。"
     },
     {
-      "standard_field": "vote_date",
-      "sources": [
-        { "source": "hou_notion_sum", "field": "request_enddate" },
-        { "source": "hou_notion_sum", "field": "request_startdate" },
-        { "source": "hou_notion_sum", "field": "reg_date" }
-      ],
-      "mapping_rule": "优先使用 request_enddate；缺失时使用 request_startdate 弱替代；再缺失时使用 reg_date 弱替代。统一规范化为 YYYY-MM-DD。"
-    },
-    {
-      "standard_field": "vote_date_is_proxy",
-      "sources": [
-        { "source": "derived", "field": "vote_date" }
-      ],
-      "mapping_rule": "vote_date 来自 request_startdate 或 reg_date 时为 true；来自 request_enddate 时为 false；缺失时为 null。"
-    },
-    {
       "standard_field": "construction_start_date",
       "sources": [
         { "source": "project_contract", "field": "startup_date" }
@@ -161,9 +145,9 @@
     {
       "standard_field": "is_before_vote_construct",
       "sources": [
-        { "source": "derived", "field": "construction_start_date/vote_date" }
+        { "source": "derived", "field": "construction_start_date/vote_end_date" }
       ],
-      "mapping_rule": "仅普通维修且 construction_start_date、vote_date 均存在时计算；construction_start_date < vote_date 为 true，否则 false。"
+      "mapping_rule": "仅普通维修且 construction_start_date、vote_end_date 均存在时计算；construction_start_date < vote_end_date 为 true，否则 false。"
     },
     {
       "standard_field": "budget_amount",

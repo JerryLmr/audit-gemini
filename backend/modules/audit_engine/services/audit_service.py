@@ -41,8 +41,10 @@ PROCESS_FIELDS = [
     "vote_pass_rate_by_household",
     "vote_pass_rate_by_area",
     "vote_legal",
-    "vote_date",
-    "vote_date_is_proxy",
+    "vote_start_date",
+    "vote_end_date",
+    "resolution_date",
+    "registration_date",
     "construction_start_date",
     "is_before_vote_construct",
 ]
@@ -66,9 +68,8 @@ TRACE_CODES = {
 PROCESS_CODES = {
     "PROCESS_NORMAL_VOTE_MISSING",
     "PROCESS_NORMAL_VOTE_NOT_LEGAL",
-    "PROCESS_VOTE_DATE_MISSING",
+    "PROCESS_VOTE_END_DATE_MISSING",
     "PROCESS_CONSTRUCTION_BEFORE_VOTE_CONFIRMED",
-    "PROCESS_VOTE_DATE_PROXY_USED",
     "PROCESS_EMERGENCY_FLOW_EXEMPTED",
     "PROCESS_EMERGENCY_TRACE_REVIEW_REQUIRED",
     "PROCESS_PROPERTY_VALUE_UNSUPPORTED",
@@ -315,25 +316,20 @@ def _audit_process(fields: Dict[str, Any], trace_result: Dict[str, Any]) -> Dict
         reasons.append("普通维修表决通过率未达到当前口径或无法确认，建议人工复核。")
         if fields.get("vote_legal") is None:
             missing.extend(["vote_pass_rate_by_household", "vote_pass_rate_by_area"])
-    if fields.get("construction_start_date") and not fields.get("vote_date"):
-        codes.append("PROCESS_VOTE_DATE_MISSING")
-        reasons.append("缺少表决日期，无法完成普通维修开工与表决先后顺序校验。")
-        missing.append("vote_date")
+    if fields.get("construction_start_date") and not fields.get("vote_end_date"):
+        codes.append("PROCESS_VOTE_END_DATE_MISSING")
+        reasons.append("缺少征询结束日期，无法完成普通维修开工与表决先后顺序校验。")
+        missing.append("vote_end_date")
     elif fields.get("is_before_vote_construct") is True:
         codes.append("PROCESS_CONSTRUCTION_BEFORE_VOTE_CONFIRMED")
         reasons.append("普通维修已确认存在先开工后表决的流程时序风险。")
-    if fields.get("vote_date_is_proxy") is True:
-        codes.append("PROCESS_VOTE_DATE_PROXY_USED")
-        reasons.append("当前 vote_date 使用征询日期或录入日期代替，仅用于展示和弱校验。")
 
     if codes:
         hard_codes = {
             "PROCESS_NORMAL_VOTE_NOT_LEGAL",
             "PROCESS_CONSTRUCTION_BEFORE_VOTE_CONFIRMED",
         }
-        if codes == ["PROCESS_VOTE_DATE_PROXY_USED"]:
-            result = "compliant"
-        elif any(code in hard_codes for code in codes):
+        if any(code in hard_codes for code in codes):
             result = "manual_review"
         else:
             result = "need_supplement"

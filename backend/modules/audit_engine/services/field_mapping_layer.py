@@ -358,26 +358,15 @@ def _map_vote_fields(sources: Dict[str, Dict[str, Any]]) -> Tuple[Dict[str, Any]
     if row_exists and mapped["vote_legal"] is None:
         warnings.append("Hou_notion_sum 存在但缺少计算通过率所需字段，vote_legal 需人工复核。")
 
-    vote_date = None
-    vote_date_source_field = None
-    vote_date_is_proxy = None
-    for source_field, is_proxy, warning in (
-        ("request_enddate", True, "当前 vote_date 来自征询结束日期，仅用于展示和弱校验。"),
-        ("request_startdate", True, "当前以征询开始日期代替表决日期，仅用于展示和弱校验。"),
-        ("reg_date", True, "当前以录入日期代替表决日期，仅用于展示和弱校验。"),
-    ):
-        candidate = _to_date(row.get(_normalize_key(source_field)))
-        if candidate:
-            vote_date = candidate
-            vote_date_source_field = source_field
-            vote_date_is_proxy = is_proxy
-            if warning:
-                warnings.append(warning)
-            break
-    mapped["vote_date"] = vote_date
-    mapped["vote_date_is_proxy"] = vote_date_is_proxy
-    records.append(_record("vote_date", vote_date, "hou_notion_sum", vote_date_source_field or "request_enddate/request_startdate/reg_date"))
-    records.append(_record("vote_date_is_proxy", vote_date_is_proxy, "derived", vote_date_source_field or "vote_date"))
+    vote_start_date = _to_date(row.get("request_startdate"))
+    vote_end_date = _to_date(row.get("request_enddate"))
+    registration_date = _to_date(row.get("reg_date"))
+    mapped["vote_start_date"] = vote_start_date
+    mapped["vote_end_date"] = vote_end_date
+    mapped["registration_date"] = registration_date
+    records.append(_record("vote_start_date", vote_start_date, "hou_notion_sum", "request_startdate"))
+    records.append(_record("vote_end_date", vote_end_date, "hou_notion_sum", "request_enddate"))
+    records.append(_record("registration_date", registration_date, "hou_notion_sum", "reg_date"))
     return mapped, records, warnings
 
 
@@ -485,10 +474,10 @@ def build_field_mapping_layer(payload: Dict[str, Any]) -> Dict[str, Any]:
     if standard_fields.get("repair_nature") == "normal":
         is_before_vote_construct = _date_lt(
             standard_fields.get("construction_start_date"),
-            standard_fields.get("vote_date"),
+            standard_fields.get("vote_end_date"),
         )
     standard_fields["is_before_vote_construct"] = is_before_vote_construct
-    records.append(_record("is_before_vote_construct", is_before_vote_construct, "derived", "construction_start_date/vote_date"))
+    records.append(_record("is_before_vote_construct", is_before_vote_construct, "derived", "construction_start_date/vote_end_date"))
 
     for field_name, candidates in (
         (

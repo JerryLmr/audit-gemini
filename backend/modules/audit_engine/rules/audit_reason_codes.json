@@ -22,9 +22,8 @@
       "PROCESS_NORMAL_VOTE_MISSING": "普通维修缺少表决流程信息。",
       "PROCESS_NORMAL_VOTE_NOT_LEGAL": "普通维修表决通过率未达到当前口径或无法确认。",
       "PROCESS_NORMAL_CONSTRUCTION_BEFORE_VOTE_REVIEW": "旧版普通维修流程时序提示；当前四层审计不主动发出。",
-      "PROCESS_VOTE_DATE_MISSING": "缺少表决日期，无法完成普通维修时序校验。",
+      "PROCESS_VOTE_END_DATE_MISSING": "缺少征询结束日期，无法完成普通维修时序校验。",
       "PROCESS_CONSTRUCTION_BEFORE_VOTE_CONFIRMED": "普通维修已确认存在先开工后表决的流程时序风险。",
-      "PROCESS_VOTE_DATE_PROXY_USED": "当前 vote_date 使用征询日期或录入日期代替，仅用于展示和弱校验。",
       "PROCESS_EMERGENCY_FLOW_EXEMPTED": "紧急维修仅豁免普通流程，不豁免本体合规。",
       "PROCESS_EMERGENCY_TRACE_REVIEW_REQUIRED": "紧急维修资料痕迹仍需补充或人工复核。",
       "PROCESS_PROPERTY_VALUE_UNSUPPORTED": "工程性质 property 值不在当前支持范围内，需人工复核输入口径。"

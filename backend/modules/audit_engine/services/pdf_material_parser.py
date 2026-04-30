@@ -109,7 +109,7 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
         "material_type": "unknown_pdf",
         "material_type_label": MATERIAL_TYPE_LABELS["unknown_pdf"],
         "pages_count": 0,
-        "raw_evidence": [],
+        "extracted_fields": [],
         "warnings": [],
     }
     try:
@@ -168,10 +168,12 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
                     evidence.append(item)
         elif material_type == "vote_summary_pdf":
             for item in [
-                _find_line_value(raw_page1, ["征询时间", "表决时间", "征询结束日期"], "征询结束日期", "vote_end_date", _to_date, 0.86),
-                _find_line_value(raw_page1, ["征询开始日期"], "征询开始日期", "vote_start_date", _to_date, 0.84),
-                _find_line_value(raw_page1, ["同意票数比例"], "同意票数比例", "agree_count_rate", _to_percent, 0.8),
-                _find_line_value(raw_page1, ["同意面积比例"], "同意面积比例", "agree_area_rate", _to_percent, 0.8),
+                _find_line_value(raw_page1, ["征询结束日期", "表决结束日期", "征询时间"], "征询结束日期", "vote_end_date", _to_date, 0.86),
+                _find_line_value(raw_page1, ["征询开始日期", "表决开始日期"], "征询开始日期", "vote_start_date", _to_date, 0.84),
+                _find_line_value(raw_page1, ["同意票数", "同意户数"], "同意票数", "agree_hou", _to_amount, 0.8),
+                _find_line_value(raw_page1, ["同意面积"], "同意面积", "agree_area", _to_amount, 0.8),
+                _find_line_value(raw_page1, ["总投票权数", "总户数"], "总投票权数", "count_hou", _to_amount, 0.8),
+                _find_line_value(raw_page1, ["总投票面积", "总面积"], "总投票面积", "sum_area", _to_amount, 0.8),
             ]:
                 if item:
                     evidence.append(item)
@@ -196,7 +198,7 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
             if "副主任" in normalized_page1:
                 evidence.append(_evidence("deputy_director_signed", "副主任签章", True, 1, "副主任签章", 0.78))
 
-        result["raw_evidence"] = evidence
+        result["extracted_fields"] = evidence
         result["status"] = "parsed_pdf" if material_type != "unknown_pdf" else "unrecognized_pdf"
         result["message"] = "PDF 文本解析完成。"
         return result

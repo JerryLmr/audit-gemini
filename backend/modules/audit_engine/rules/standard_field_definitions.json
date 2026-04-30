@@ -16,7 +16,7 @@
       "description": "工程名称，用于项目本体合规判断和目录映射。",
       "llm_extractable": true,
       "allow_inference": false,
-      "source_priority": ["维修工程信息", "维修决案", "维修预案", "维修对象", "text"],
+      "source_priority": ["excel", "pdf", "维修工程信息", "维修决案", "维修预案", "维修对象", "text"],
       "required_for_audit": true,
       "comment": "工程名称，用于项目本体合规判断和目录映射。"
     },
@@ -221,7 +221,7 @@
       "type": "date|null",
       "field_level": "原始事实",
       "description": "征询或表决开始日期。",
-      "source_priority": ["pdf", "业主表决汇总.REQUEST_STARTDATE", "业主大会决议.发送征求意见表开始日期"],
+      "source_priority": ["excel", "pdf", "业主表决汇总.REQUEST_STARTDATE", "业主大会决议.发送征求意见表开始日期"],
       "required_for_audit": false,
       "comment": "征询开始日期，作为时序佐证字段。"
     },
@@ -232,7 +232,7 @@
       "type": "date|null",
       "field_level": "原始事实",
       "description": "征询或表决结束日期。",
-      "source_priority": ["业主表决汇总.REQUEST_ENDDATE", "业主大会决议.发送征求意见表结束日期", "pdf"],
+      "source_priority": ["excel", "pdf", "业主表决汇总.REQUEST_ENDDATE", "业主大会决议.发送征求意见表结束日期"],
       "required_for_audit": false,
       "comment": "征询结束日期，作为主表决时点。"
     },
@@ -257,28 +257,6 @@
       "source_priority": ["业主表决汇总.REG_DATE", "pdf"],
       "required_for_audit": false,
       "comment": "登记录入日期，仅作辅助说明。"
-    },
-    "vote_date": {
-      "field_name": "表决日期",
-      "field_key": "vote_date",
-      "category": "表决",
-      "type": "date|null",
-      "field_level": "派生事实",
-      "description": "兼容旧规则的表决日期镜像字段。",
-      "source_priority": ["derived"],
-      "required_for_audit": false,
-      "comment": "由 vote_end_date/vote_start_date/registration_date/resolution_date 推导，仅用于兼容旧规则。"
-    },
-    "vote_date_is_proxy": {
-      "field_name": "表决日期是否代用",
-      "field_key": "vote_date_is_proxy",
-      "category": "表决",
-      "type": "boolean|null",
-      "field_level": "派生事实",
-      "description": "vote_date 是否使用征询开始日期或录入日期代替。",
-      "source_priority": ["derived"],
-      "required_for_audit": false,
-      "comment": "vote_date 是否使用征询开始日期或录入日期代替；仅用于展示和弱校验提示。"
     },
     "need_construction_contract": {
       "field_name": "是否需要施工合同",
@@ -377,7 +355,7 @@
       "description": "普通维修是否已确认先开工后表决。",
       "source_priority": ["derived"],
       "required_for_audit": false,
-      "comment": "普通维修是否已确认先开工后表决；仅在 construction_start_date 和 vote_date 均存在时计算。"
+      "comment": "普通维修是否已确认先开工后表决；仅在 construction_start_date 和 vote_end_date 均存在时计算。"
     },
     "budget_amount": {
       "field_name": "预算金额",
@@ -386,7 +364,7 @@
       "type": "number|null",
       "field_level": "原始事实",
       "description": "预算金额，仅用于金额与造价信息展示。",
-      "source_priority": ["三审工程维修项目表", "维修决案", "维修预案", "维修工程信息"],
+      "source_priority": ["excel", "pdf", "三审工程维修项目表", "维修决案", "维修预案", "维修工程信息"],
       "required_for_audit": false,
       "comment": "预算金额，仅用于金额与造价信息展示。"
     },
@@ -397,7 +375,7 @@
       "type": "number|null",
       "field_level": "原始事实",
       "description": "决案金额，仅用于解释和后续规则扩展。",
-      "source_priority": ["三审工程维修项目表", "维修决案", "业主表决结果"],
+      "source_priority": ["excel", "pdf", "三审工程维修项目表", "维修决案", "业主表决结果"],
       "required_for_audit": false,
       "comment": "决案金额，仅用于解释和后续规则扩展。"
     },
@@ -461,7 +439,7 @@
       "description": "维修实施范围，用于解释和后续规则扩展。",
       "llm_extractable": true,
       "allow_inference": false,
-      "source_priority": ["pdf", "维修决案", "维修预案", "三审工程维修项目表"],
+      "source_priority": ["excel.range", "pdf", "维修决案", "维修预案", "三审工程维修项目表"],
       "required_for_audit": false,
       "comment": "维修实施范围，仅用于解释和后续规则扩展。"
     },
@@ -474,7 +452,7 @@
       "description": "维修原因，用于解释和后续规则扩展。",
       "llm_extractable": true,
       "allow_inference": false,
-      "source_priority": ["pdf", "维修决案", "维修预案", "维修工单"],
+      "source_priority": ["excel.reason", "excel.repairreason", "pdf", "维修决案", "维修预案", "维修工单"],
       "required_for_audit": false,
       "comment": "维修原因，仅用于解释和后续规则扩展。"
     }

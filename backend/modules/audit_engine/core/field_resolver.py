@@ -76,6 +76,9 @@ def make_candidate(
     raw_value: Any,
     confidence: float = 1.0,
 ) -> FieldCandidate:
+    metadata = {}
+    if field_type.startswith("date") and _is_present(raw_value) and normalize_value(raw_value, field_type) is None:
+        metadata = {"quality_score": 0.0, "quality_flags": ["invalid_date"]}
     return FieldCandidate(
         source_type=source_type,
         source_file=source_file,
@@ -84,6 +87,7 @@ def make_candidate(
         raw_value=raw_value,
         normalized_value=normalize_value(raw_value, field_type),
         confidence=confidence,
+        metadata=metadata,
     )
 
 
@@ -119,6 +123,9 @@ def resolve_field(
 
     def _candidate_score(candidate: FieldCandidate) -> float:
         quality_score = float((candidate.metadata or {}).get("quality_score") or 0)
+        if quality_score == 0 and not (candidate.metadata or {}).get("quality_flags"):
+            quality_score = 0.5
+        flags = set((candidate.metadata or {}).get("quality_flags") or [])
         source_column = str(candidate.source_column or "").strip().lower()
         # 收口规则：repair_scope 若 PDF 低质量且存在 Excel 有效值，则降级 PDF 候选，避免错误覆盖。
         if (
@@ -137,6 +144,14 @@ def resolve_field(
             if source_column == "repairreason" and isinstance(candidate.normalized_value, str):
                 # 当仅有 REPAIRREASON 时，允许更完整文本获得轻微加分。
                 quality_score += min(0.1, len(candidate.normalized_value.strip()) / 1000)
+        if "semantic_pollution" in flags:
+            quality_score -= 0.4
+        if "length_abnormal" in flags:
+            quality_score -= 0.2
+        if "invalid_date" in flags:
+            quality_score -= 0.6
+        if "zero_suspicious" in flags:
+            quality_score -= 0.2
         return float(candidate.confidence or 0) + quality_score
 
     ordered = sorted(
@@ -270,29 +285,13 @@ def _derive_fields(
     vote_end_date = _value(runtimes, "vote_end_date")
     resolution_date = _value(runtimes, "resolution_date")
     registration_date = _value(runtimes, "registration_date")
-    if vote_end_date:
-        vote_date = vote_end_date
-    elif vote_start_date:
-        vote_date = vote_start_date
-    elif registration_date:
-        vote_date = registration_date
-    else:
-        vote_date = resolution_date
-    runtimes["vote_date"] = _runtime("vote_date", vote_date, "inferred", "vote_start_date/vote_end_date/resolution_date/registration_date")
-
     has_vote_trace = True if any(_value(runtimes, key) is not None for key in ("vote_total_households", "vote_approved_households", "vote_start_date", "vote_end_date", "resolution_date", "registration_date")) else bool(explicit_vote)
     runtimes["has_vote_trace"] = _runtime("has_vote_trace", has_vote_trace, "inferred", "vote_presence")
-    vote_date_is_proxy = None
-    if vote_date:
-        vote_date_is_proxy = bool(vote_start_date or registration_date)
-        if vote_date_is_proxy:
-            warnings.append("当前表决关键日期来自征询开始/录入日期代替，建议人工复核。")
-    runtimes["vote_date_is_proxy"] = _runtime("vote_date_is_proxy", vote_date_is_proxy, "inferred", "vote_split_dates")
 
     is_before_vote = None
     if repair_nature == "normal":
-        is_before_vote = _date_lt(_value(runtimes, "construction_start_date"), _value(runtimes, "vote_date"))
-    runtimes["is_before_vote_construct"] = _runtime("is_before_vote_construct", is_before_vote, "inferred", "construction_start_date/vote_date")
+        is_before_vote = _date_lt(_value(runtimes, "construction_start_date"), _value(runtimes, "vote_end_date"))
+    runtimes["is_before_vote_construct"] = _runtime("is_before_vote_construct", is_before_vote, "inferred", "construction_start_date/vote_end_date")
 
     project_name = str(_value(runtimes, "project_name") or "")
     if catalog_mapper:
