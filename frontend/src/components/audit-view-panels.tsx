@@ -655,17 +655,18 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
     return `${sheet || "系统推断"}${field ? ` / ${field}` : ""}`;
   };
   return (
-    <section className="glass-card p-6">
-      <div className="mb-5 flex items-center gap-3">
-        <BrainCircuit className="h-5 w-5 text-violet-300" />
-        <div>
-          <h3 className="text-base font-bold text-white">证据区</h3>
-          <p className="text-xs text-slate-500">
-            原始材料、结构化抽取与 AI 理解分开呈现
-          </p>
+    <details className="glass-card p-6">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <BrainCircuit className="h-5 w-5 text-violet-300" />
+          <div>
+            <h3 className="text-base font-bold text-white">字段来源与候选值</h3>
+            <p className="text-xs text-slate-500">用于审计留痕和字段来源追溯</p>
+          </div>
         </div>
-      </div>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs text-slate-400">展开</span>
+      </summary>
+      <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
           <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
             <FileText className="h-4 w-4 text-blue-300" />
@@ -813,7 +814,7 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
           </div>
         </div>
       )}
-    </section>
+    </details>
   );
 }
 
@@ -822,7 +823,7 @@ export function ConflictConfirmPanel({
   onConfirm,
 }: {
   view: AuditView;
-  onConfirm?: (fieldKey: string, value: unknown) => void;
+  onConfirm?: (overrides: Record<string, unknown>) => void;
 }) {
   const conflicts = view.field_conflicts || [];
   const fieldSources = view.field_sources || {};
@@ -837,14 +838,12 @@ export function ConflictConfirmPanel({
         const sources = (fieldSources[key] || [])
           .filter((s) => s.source_type === "pdf" || s.source_type === "excel")
           .filter((s, i, arr) => arr.findIndex((x) => `${String(x.file_name || "")}|${String(x.source_sheet || "")}|${String(x.source_field || "")}|${String(x.value ?? "")}` === `${String(s.file_name || "")}|${String(s.source_sheet || "")}|${String(s.source_field || "")}|${String(s.value ?? "")}`) === i);
-        const numeric = sources.filter((s) => typeof s.value === "number").map((s) => Number(s.value));
-        const hasNonZero = numeric.some((v) => v !== 0);
-        const filtered = hasNonZero ? sources.filter((s) => !(typeof s.value === "number" && Number(s.value) === 0)) : sources;
-        const distinctValues = filtered.filter((s, i, arr) => arr.findIndex((x) => String(x.value ?? "") === String(s.value ?? "")) === i);
+        const distinctValues = sources.filter((s, i, arr) => arr.findIndex((x) => String(x.value ?? "") === String(s.value ?? "")) === i);
         return { key, sources: distinctValues };
       }),
     [conflicts, fieldSources],
   );
+  const [appliedCount, setAppliedCount] = useState(0);
   if (conflicts.length === 0) return null;
   return (
     <section className="glass-card p-6">
@@ -868,6 +867,9 @@ export function ConflictConfirmPanel({
                   <label key={`${fieldKey}-${i}`} className="flex items-center gap-2 text-slate-300">
                     <input type="radio" name={`conflict-${fieldKey}`} checked={selection[fieldKey] === `source-${i}`} onChange={() => setSelection((prev) => ({ ...prev, [fieldKey]: `source-${i}` }))} />
                     <span>{String(opt.source_type || "")}：{String(opt.value ?? "")}</span>
+                    {Array.isArray((opt.metadata as Record<string, unknown> | undefined)?.quality_flags) && ((opt.metadata as Record<string, unknown>).quality_flags as unknown[]).includes("zero_suspicious") && (
+                      <span className="rounded border border-amber-300/30 px-1 py-0.5 text-[10px] text-amber-300">该值可能异常（为0）</span>
+                    )}
                   </label>
                 ))}
                 <label className="flex items-center gap-2 text-slate-300">
@@ -876,29 +878,33 @@ export function ConflictConfirmPanel({
                   <input className="rounded border border-white/20 bg-black/30 px-2 py-1 text-xs text-white" value={manualValues[fieldKey] || ""} onChange={(e) => setManualValues((prev) => ({ ...prev, [fieldKey]: e.target.value }))} />
                 </label>
               </div>
-              <button
-                className="mt-3 rounded border border-amber-300/30 px-3 py-1 text-amber-200 hover:bg-amber-500/10"
-                onClick={() => {
-                  const selected = selection[fieldKey];
-                  const selectedValue = selected === "manual" ? manualValues[fieldKey] || "" : options[Number((selected || "source-0").split("-")[1])]?.value;
-                  const sourceType = String(options[Number((selected || "source-0").split("-")[1])]?.source_type || "");
-                  const sourceName = selected === "manual" ? "手动输入" : sourceType === "excel" ? "Excel" : sourceType === "pdf" ? "PDF" : sourceType;
-                  setOverrides((prev) => [
-                    ...prev.filter((item) => String(item.field_key || "") !== fieldKey),
-                    { field_key: fieldKey, selected_value: selectedValue, selected_by: "user_override", selected_at: new Date().toISOString() },
-                  ]);
-                  onConfirm?.(fieldKey, selectedValue);
-                  setFeedback(`已采用：${sourceName}（${String(conflict.field_label || fieldKey)}）`);
-                }}
-              >
-                确认
-              </button>
             </div>
           );
         })}
       </div>
+      <button
+        className="mt-4 rounded border border-amber-300/30 px-3 py-2 text-amber-200 hover:bg-amber-500/10"
+        onClick={() => {
+          const payload: Record<string, unknown> = {};
+          const nextOverrides: Array<Record<string, unknown>> = [];
+          conflicts.forEach((conflict, idx) => {
+            const fieldKey = String(conflict.field || "");
+            const options = sourceOptions[idx]?.sources || [];
+            const selected = selection[fieldKey] || "source-0";
+            const selectedValue = selected === "manual" ? manualValues[fieldKey] || "" : options[Number(selected.split("-")[1])]?.value;
+            payload[fieldKey] = selectedValue;
+            nextOverrides.push({ field_key: fieldKey, selected_value: selectedValue, selected_by: "user_override", selected_at: new Date().toISOString() });
+          });
+          setOverrides(nextOverrides);
+          setAppliedCount(Object.keys(payload).length);
+          onConfirm?.(payload);
+          setFeedback("已批量应用所选字段。");
+        }}
+      >
+        确认采用所选字段
+      </button>
       {feedback && <p className="mt-3 text-xs text-emerald-300">{feedback}</p>}
-      {overrides.length > 0 && <p className="mt-3 text-xs text-slate-400">已记录 {overrides.length} 条人工确认（当前为前端会话态）。</p>}
+      {overrides.length > 0 && <p className="mt-3 text-xs text-slate-400">已记录 {appliedCount || overrides.length} 条人工确认（当前为前端会话态）。</p>}
     </section>
   );
 }
@@ -1087,12 +1093,12 @@ export function AuditWorkspace({ view }: { view: AuditView }) {
       <IssueCardsPanel view={effectiveView} />
       <ProjectOverviewPanel view={effectiveView} />
       <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-2">
-        <TimelineTracePanel view={effectiveView} />
         <MaterialScanPanel view={effectiveView} />
+        <TimelineTracePanel view={effectiveView} />
       </div>
-      <ConflictConfirmPanel view={effectiveView} onConfirm={(fieldKey, value) => setLocalOverrides((prev) => ({ ...prev, [fieldKey]: value }))} />
-      <EvidenceExplorer view={effectiveView} />
+      <ConflictConfirmPanel view={effectiveView} onConfirm={(overrides) => setLocalOverrides((prev) => ({ ...prev, ...overrides }))} />
       <PolicyMatchPanel view={effectiveView} />
+      <EvidenceExplorer view={effectiveView} />
       <AuditorNotesPanel view={effectiveView} />
     </div>
   );

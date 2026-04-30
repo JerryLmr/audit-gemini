@@ -10,7 +10,6 @@ import pdfplumber
 
 MATERIAL_TYPE_LABELS = {
     "repair_plan_pdf": "维修预案",
-    "implementation_plan_pdf": "维修工程实施方案",
     "vote_summary_pdf": "征求意见汇总表",
     "resolution_pdf": "业主大会决议",
     "unknown_pdf": "未识别PDF材料",
@@ -55,8 +54,6 @@ def _material_type(filename: str, text: str) -> str:
     raw = f"{filename} {text}"
     if "打印维修预案" in raw or "物业大修和专项维修、更新、改造实施方案公示" in raw:
         return "repair_plan_pdf"
-    if "打印维修工程实施方案" in raw or "维修工程实施方案" in raw:
-        return "implementation_plan_pdf"
     if "实施方案征求意见汇总表" in raw or "征求意见汇总表" in raw:
         return "vote_summary_pdf"
     if "打印决议" in raw or "关于物业大修和专项维修、更新、改造使用维修资金的决议" in raw:
@@ -159,13 +156,6 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
                 if value is None:
                     continue
                 evidence.append(_evidence(key, label, value, 1, f"{label}: {raw}", 0.85))
-        elif material_type == "implementation_plan_pdf":
-            for item in [
-                _find_line_value(raw_page1, ["决案总金额", "决案金额"], "决案总金额", "final_amount", _to_amount, 0.86),
-                _find_line_value(raw_page1, ["维修设施设备名称"], "维修设施设备名称", "repair_object", None, 0.85),
-            ]:
-                if item:
-                    evidence.append(item)
         elif material_type == "vote_summary_pdf":
             for item in [
                 _find_line_value(raw_page1, ["征询结束日期", "表决结束日期", "征询时间"], "征询结束日期", "vote_end_date", _to_date, 0.86),
@@ -184,7 +174,6 @@ def parse_pdf_material(filename: str, content: bytes) -> Dict[str, Any]:
                 _find_line_value(raw_page1, ["编号", "决议编号"], "编号", "resolution_no", None, 0.84),
                 _find_line_value(raw_page1, ["征询开始日期", "发送征求意见表开始日期"], "征询开始日期", "vote_start_date", _to_date, 0.86),
                 _find_line_value(raw_page1, ["征询结束日期", "发送征求意见表结束日期"], "征询结束日期", "vote_end_date", _to_date, 0.86),
-                _find_line_value(raw_page1, ["决议生成日期"], "决议生成日期", "resolution_date", _to_date, 0.84),
                 _find_line_value(raw_page1, ["录入日期"], "录入日期", "registration_date", _to_date, 0.82),
                 _find_line_value(raw_page1, ["原维修资金预算金额", "预算金额"], "原维修资金预算金额", "budget_amount", _to_amount, 0.86),
                 _find_line_value(raw_page1, ["工程决案总金额", "决案总金额"], "工程决案总金额", "final_amount", _to_amount, 0.86),

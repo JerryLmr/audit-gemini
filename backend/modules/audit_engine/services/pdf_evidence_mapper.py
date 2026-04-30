@@ -17,7 +17,6 @@ PDF_FIELD_TO_STANDARD_FIELD: Dict[str, str] = {
     "print_date": "print_date",
     "vote_start_date": "vote_start_date",
     "vote_end_date": "vote_end_date",
-    "resolution_date": "resolution_date",
     "registration_date": "registration_date",
     "vote_passed": "vote_passed",
     "agree_hou": "vote_approved_households",
@@ -40,13 +39,17 @@ def _candidate_quality(raw_field: str, value: Any, raw_text: str, confidence: fl
     if raw_field == "repair_reason" and (len(text) > 120 or len(text) < 4):
         penalty += 0.15
         flags.append("length_abnormal")
-    if raw_field in {"budget_amount", "final_amount", "agree_hou", "agree_area", "count_hou", "sum_area"} and isinstance(value, (int, float)) and float(value) == 0.0:
-        flags.append("zero_suspicious")
-
     pollution_hit = any(keyword in text or keyword in str(raw_text or "") for keyword in POLLUTION_KEYWORDS)
     if pollution_hit:
         penalty += 0.5
         flags.append("semantic_pollution")
+    if raw_field == "repair_scope":
+        if text.startswith("号、"):
+            penalty += 0.5
+            flags.append("semantic_pollution")
+        if "小区" not in text and "花园" not in text and "苑" not in text:
+            penalty += 0.3
+            flags.append("semantic_pollution")
 
     score = max(0.0, min(1.0, float(confidence or 0) - penalty))
     return {"quality_score": round(score, 3), "quality_flags": flags}

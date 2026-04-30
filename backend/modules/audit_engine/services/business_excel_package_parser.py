@@ -236,6 +236,7 @@ FIELD_COLUMN_MAPPINGS: Tuple[Tuple[str, str, str], ...] = (
     ("project_name", "维修预案", "WSNAME"),
     ("project_name", "维修对象", "MO_NAME"),
     ("project_name", "施工合同表", "NAME"),
+    ("applicant", "业主大会决议", "HC_NAME"),
     ("project_item_code", "维修工程信息", "WSCODE"),
     ("project_item_code", "维修决案", "WSCODE"),
     ("project_item_code", "维修预案", "WSCODE"),
@@ -281,7 +282,6 @@ FIELD_COLUMN_MAPPINGS: Tuple[Tuple[str, str, str], ...] = (
     ("vote_start_date", "业主表决汇总", "REQUEST_STARTDATE"),
     ("vote_start_date", "业主大会决议", "发送征求意见表开始日期"),
     ("registration_date", "业主表决汇总", "REG_DATE"),
-    ("resolution_date", "业主大会决议", "决议生成日期"),
     ("warranty_status", "维修决案", "EXPIRER_REMARK"),
     ("warranty_status", "维修预案", "EXPIRER_REMARK"),
 )
@@ -469,7 +469,7 @@ def _build_project_request(row_index: int, project_key: str, project_rows: Dict[
     if resolution:
         end_date = _row_get(resolution, "发送征求意见表结束日期")
         start_date = _row_get(resolution, "发送征求意见表开始日期")
-        reg_date = _row_get(resolution, "决议生成日期")
+        reg_date = _row_get(resolution, "REG_DATE")
         if _present(end_date):
             hou_notion_sum["request_enddate"] = end_date
         if _present(start_date):

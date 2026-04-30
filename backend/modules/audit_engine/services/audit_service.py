@@ -43,7 +43,6 @@ PROCESS_FIELDS = [
     "vote_legal",
     "vote_start_date",
     "vote_end_date",
-    "resolution_date",
     "registration_date",
     "construction_start_date",
     "is_before_vote_construct",

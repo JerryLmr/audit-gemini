@@ -35,9 +35,9 @@ FIELD_LABELS = {
     "final_amount": "决算/最终金额",
     "repair_scope": "维修范围",
     "repair_reason": "维修原因",
+    "applicant": "申报主体",
     "vote_start_date": "征询开始日期",
     "vote_end_date": "征询结束日期",
-    "resolution_date": "决议生成日期",
     "registration_date": "录入日期",
     "vote_pass_rate_by_household": "按户数通过率",
     "vote_pass_rate_by_area": "按面积通过率",
@@ -223,18 +223,29 @@ def _build_field_sources(standard_fields: Dict[str, Any]) -> Dict[str, List[Dict
                     "metadata": c.get("metadata") if isinstance(c.get("metadata"), dict) else {},
                 }
             )
-        # 收口去噪：同字段存在非 0 数值候选时，过滤 0 值候选，避免冲突区出现无效 0。
-        numeric_values = [s.get("value") for s in sources if isinstance(s.get("value"), (int, float))]
-        has_non_zero_numeric = any(float(v) != 0.0 for v in numeric_values)
-        if has_non_zero_numeric:
-            sources = [
-                s
-                for s in sources
-                if not (isinstance(s.get("value"), (int, float)) and float(s.get("value")) == 0.0)
-            ]
         if sources:
             field_sources[field_key] = sources
     return field_sources
+
+
+def _inject_applicant_field(
+    standard_fields: Dict[str, Any],
+    candidates_by_field: Dict[str, List[FieldCandidate]],
+) -> Dict[str, Any]:
+    output = {k: dict(v) if isinstance(v, dict) else v for k, v in (standard_fields or {}).items()}
+    candidates = candidates_by_field.get("applicant") or []
+    present = [c for c in candidates if c.normalized_value is not None and c.normalized_value != ""]
+    if not present:
+        return output
+    selected = present[0]
+    output["applicant"] = {
+        "field_key": "applicant",
+        "value": selected.normalized_value,
+        "status": "resolved",
+        "candidates": [c.to_dict() for c in candidates],
+        "selected_index": candidates.index(selected),
+    }
+    return output
 
 
 def _build_structured_conflicts(standard_fields: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -334,6 +345,7 @@ async def analyze_single_project_file(files: Iterable[UploadFile]) -> Dict[str, 
     raw_text = _raw_text_from_row(row, resolved["standard_fields"])
     llm_result = classify_fields_with_local_llm(raw_fields, raw_text)
     merged = merge_llm_fields(resolved["standard_fields"], llm_result)
+    merged["final_fields"] = _inject_applicant_field(merged["final_fields"], normalized_candidates)
 
     final_request = dict(row.get("audit_request") or {})
     final_request["standard_fields"] = merged["final_fields"]

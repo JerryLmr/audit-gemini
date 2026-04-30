@@ -32,7 +32,6 @@ FIELD_LABELS = {
     "is_property_service_scope": "物业服务范围",
     "vote_start_date": "征询开始日期",
     "vote_end_date": "征询结束日期",
-    "resolution_date": "决议生成日期",
     "registration_date": "录入日期",
 }
 
@@ -138,7 +137,7 @@ def _candidate_source(candidate: Dict[str, Any]) -> str:
         return f"{file_name}{page_part} / {label}" if file_name else f"PDF{page_part} / {label}"
     if str(candidate.get("source_type") or "") == "excel":
         parts = [file_name, sheet, column]
-        return " / ".join([item for item in parts if item])
+        return f"Excel / {' / '.join([item for item in parts if item])}"
     if column == "__row_exists__":
         return f"{sheet}（工作表存在）"
     return ".".join(item for item in [sheet, column] if item)
@@ -244,7 +243,6 @@ def _timeline_from_candidates(standard_fields: Dict[str, Any]) -> List[Dict[str,
     request_start = _selected_candidate(standard_fields.get("vote_start_date") or {})
     request_end = _selected_candidate(standard_fields.get("vote_end_date") or {})
     reg_date = _selected_candidate(standard_fields.get("registration_date") or {})
-    resolution_date = _selected_candidate(standard_fields.get("resolution_date") or {})
     start = _field_entry(standard_fields, "construction_start_date")
     finish = _field_entry(standard_fields, "construction_finish_date")
 
@@ -275,18 +273,6 @@ def _timeline_from_candidates(standard_fields: Dict[str, Any]) -> List[Dict[str,
             "该日期不能直接作为维修预案/决案形成时间" if reg_date else "当前材料未识别决议录入日期",
         )
     )
-    timeline.append(
-        _timeline_item(
-            "决议生成日期",
-            resolution_date.get("normalized_value") if resolution_date else None,
-            "original" if resolution_date else "missing",
-            _candidate_source(resolution_date) if resolution_date else "未识别",
-            "决议文本形成日期，需与征询时间共同判定流程时序",
-            float(resolution_date.get("confidence") or 0.9) if resolution_date else 0,
-            "当前材料未识别决议生成日期" if not resolution_date else None,
-        )
-    )
-
     for label, entry, meaning, warning in [
         ("施工开始", start, "需从施工合同、开工报告或施工记录中确认", "当前材料未提供施工合同/开工记录"),
         ("施工完成", finish, "需从完工验收报告或施工记录中确认", "当前材料未提供完工验收报告"),

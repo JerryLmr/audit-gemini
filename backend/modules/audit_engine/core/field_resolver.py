@@ -116,6 +116,29 @@ def resolve_field(
 ) -> FieldRuntime:
     definition = field_definition or {}
     all_candidates = list(candidates or [])
+    zero_sensitive_fields = {
+        "budget_amount",
+        "final_amount",
+        "vote_total_area",
+        "vote_approved_area",
+        "vote_total_households",
+        "vote_approved_households",
+    }
+    if field_key in zero_sensitive_fields:
+        non_zero_exists = any(
+            isinstance(c.normalized_value, (int, float)) and float(c.normalized_value) != 0.0
+            for c in all_candidates
+        )
+        if non_zero_exists:
+            for c in all_candidates:
+                if isinstance(c.normalized_value, (int, float)) and float(c.normalized_value) == 0.0:
+                    c.metadata = dict(c.metadata or {})
+                    flags = list(c.metadata.get("quality_flags") or [])
+                    if "zero_suspicious" not in flags:
+                        flags.append("zero_suspicious")
+                    c.metadata["quality_flags"] = flags
+                    if "quality_score" not in c.metadata:
+                        c.metadata["quality_score"] = 0.5
     has_excel_value = any(
         (c.source_type == "excel") and _is_present(c.normalized_value)
         for c in all_candidates
@@ -283,9 +306,8 @@ def _derive_fields(
     explicit_vote = _value(runtimes, "has_vote_trace")
     vote_start_date = _value(runtimes, "vote_start_date")
     vote_end_date = _value(runtimes, "vote_end_date")
-    resolution_date = _value(runtimes, "resolution_date")
     registration_date = _value(runtimes, "registration_date")
-    has_vote_trace = True if any(_value(runtimes, key) is not None for key in ("vote_total_households", "vote_approved_households", "vote_start_date", "vote_end_date", "resolution_date", "registration_date")) else bool(explicit_vote)
+    has_vote_trace = True if any(_value(runtimes, key) is not None for key in ("vote_total_households", "vote_approved_households", "vote_start_date", "vote_end_date", "registration_date")) else bool(explicit_vote)
     runtimes["has_vote_trace"] = _runtime("has_vote_trace", has_vote_trace, "inferred", "vote_presence")
 
     is_before_vote = None
