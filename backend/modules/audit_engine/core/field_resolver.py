@@ -111,11 +111,39 @@ def resolve_field(
     field_definition: Optional[Dict[str, Any]] = None,
 ) -> FieldRuntime:
     definition = field_definition or {}
+    all_candidates = list(candidates or [])
+    has_excel_value = any(
+        (c.source_type == "excel") and _is_present(c.normalized_value)
+        for c in all_candidates
+    )
+
+    def _candidate_score(candidate: FieldCandidate) -> float:
+        quality_score = float((candidate.metadata or {}).get("quality_score") or 0)
+        source_column = str(candidate.source_column or "").strip().lower()
+        # 收口规则：repair_scope 若 PDF 低质量且存在 Excel 有效值，则降级 PDF 候选，避免错误覆盖。
+        if (
+            field_key == "repair_scope"
+            and has_excel_value
+            and candidate.source_type == "pdf"
+            and bool((candidate.metadata or {}).get("quality_flags"))
+        ):
+            quality_score -= 1.0
+        # 收口规则：repair_reason 默认优先 REASON；REPAIRREASON 作为补充候选。
+        if field_key == "repair_reason":
+            if source_column == "reason":
+                quality_score += 0.2
+            elif source_column == "repairreason":
+                quality_score -= 0.05
+            if source_column == "repairreason" and isinstance(candidate.normalized_value, str):
+                # 当仅有 REPAIRREASON 时，允许更完整文本获得轻微加分。
+                quality_score += min(0.1, len(candidate.normalized_value.strip()) / 1000)
+        return float(candidate.confidence or 0) + quality_score
+
     ordered = sorted(
-        list(candidates or []),
+        all_candidates,
         key=lambda candidate: (
             _priority_index(candidate, definition.get("source_priority", [])),
-            -float((candidate.confidence or 0) + float((candidate.metadata or {}).get("quality_score") or 0)),
+            -_candidate_score(candidate),
         ),
     )
     present_indexes = [
@@ -138,8 +166,8 @@ def resolve_field(
         if len(present_indexes) >= 2:
             top = ordered[present_indexes[0]]
             second = ordered[present_indexes[1]]
-            top_score = float(top.confidence or 0) + float((top.metadata or {}).get("quality_score") or 0)
-            second_score = float(second.confidence or 0) + float((second.metadata or {}).get("quality_score") or 0)
+            top_score = _candidate_score(top)
+            second_score = _candidate_score(second)
             if abs(top_score - second_score) >= 0.2:
                 status = "resolved"
     return FieldRuntime(

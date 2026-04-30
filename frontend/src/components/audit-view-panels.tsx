@@ -621,7 +621,6 @@ export function MaterialScanPanel({ view }: { view: AuditView }) {
 }
 
 export function EvidenceExplorer({ view }: { view: AuditView }) {
-  const pdfExtraction = view.evidence_sections.pdf_extraction || [];
   const fieldSources = view.field_sources || {};
   const fieldLabelMap = Object.fromEntries(
     Object.entries(view.project_overview || {}).map(([key, value]) => [key, value.field_label || key]),
@@ -629,7 +628,7 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
   const evidenceByField = Object.entries(fieldSources)
     .map(([fieldKey, sources]) => {
       const sourceList = (sources || [])
-        .filter((source) => source.source_type === "pdf" || source.source_type === "excel")
+        .filter((source) => source.source_type === "pdf" || source.source_type === "excel" || source.source_type === "derived" || source.source_type === "manual_input")
         .filter((source, index, arr) => {
           const key = `${fieldKey}|${String(source.file_name || "")}|${String(source.source_field || "")}|${String(source.value ?? "")}`;
           return arr.findIndex((x) => `${fieldKey}|${String(x.file_name || "")}|${String(x.source_field || "")}|${String(x.value ?? "")}` === key) === index;
@@ -637,6 +636,24 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
       return { fieldKey, sources: sourceList };
     })
     .filter((item) => item.sources.length > 0);
+  const buildSourceLabel = (source: Record<string, unknown>) => {
+    const metadata = (source.metadata || {}) as Record<string, unknown>;
+    const fileName = String(source.file_name || "");
+    const sheet = String(source.source_sheet || "");
+    const field = String(source.source_field || "");
+    const label = String(metadata.label || field || "");
+    if (String(source.source_type || "") === "pdf") {
+      const page = metadata.page ? ` / 第${String(metadata.page)}页` : "";
+      return `${fileName}${page} / ${label || "PDF字段"}`;
+    }
+    if (String(source.source_type || "") === "excel") {
+      return `${fileName}${sheet ? ` / ${sheet}` : ""}${field ? ` / ${field}` : ""}`;
+    }
+    if (String(source.source_type || "") === "manual_input") {
+      return "人工输入";
+    }
+    return `${sheet || "系统推断"}${field ? ` / ${field}` : ""}`;
+  };
   return (
     <section className="glass-card p-6">
       <div className="mb-5 flex items-center gap-3">
@@ -714,11 +731,11 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
           </div>
         </div>
       </div>
-      {(pdfExtraction.length > 0 || evidenceByField.length > 0) && (
+      {evidenceByField.length > 0 && (
         <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
           <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
             <FileText className="h-4 w-4 text-cyan-300" />
-            PDF材料佐证
+            字段来源与候选值
           </h4>
           <div className="space-y-4">
             {evidenceByField.map((entry) => (
@@ -733,8 +750,7 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
                     return (
                       <div key={`${entry.fieldKey}-selected-${index}`} className="border-t border-white/5 pt-2">
                         <p className="break-words text-slate-300">
-                          主来源：{String(source.file_name || "")}
-                          {metadata.page ? ` / 第${String(metadata.page)}页` : ""}
+                          主来源：{buildSourceLabel(source)}
                         </p>
                         <p className="break-words text-slate-500">
                           {metadata.raw_text ? `原文：${String(metadata.raw_text)}` : `原字段：${String(source.source_field || "")}`}
@@ -748,13 +764,37 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
                   <details className="rounded border border-white/5 p-2">
                     <summary className="cursor-pointer text-slate-400">查看其他来源</summary>
                     <div className="mt-2 space-y-2">
+                      {entry.fieldKey === "repair_reason" && (() => {
+                        const reasonDetails = entry.sources.filter((s) => String(s.source_field || "").toUpperCase() === "REPAIRREASON");
+                        if (reasonDetails.length > 1) {
+                          return (
+                            <details className="rounded border border-white/5 p-2 text-slate-400">
+                              <summary className="cursor-pointer">来自 REPAIRREASON 的 {reasonDetails.length} 条候选原因</summary>
+                              <div className="mt-2 space-y-2">
+                                {reasonDetails.map((source, index) => {
+                                  const metadata = (source.metadata || {}) as Record<string, unknown>;
+                                  return (
+                                    <div key={`${entry.fieldKey}-repairreason-${index}`} className="border-t border-white/5 pt-2">
+                                      <p className="break-words text-slate-300">来源：{buildSourceLabel(source)}</p>
+                                      <p className="break-words text-slate-500">{metadata.raw_text ? `原文：${String(metadata.raw_text)}` : "原始字段：REPAIRREASON，业务含义待确认"}</p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </details>
+                          );
+                        }
+                        return null;
+                      })()}
                       {entry.sources.filter((source) => source.value !== (view.flat_standard_fields || {})[entry.fieldKey]).map((source, index) => {
+                        if (entry.fieldKey === "repair_reason" && String(source.source_field || "").toUpperCase() === "REPAIRREASON") {
+                          return null;
+                        }
                         const metadata = (source.metadata || {}) as Record<string, unknown>;
                         return (
                           <div key={`${entry.fieldKey}-${index}`} className="border-t border-white/5 pt-2">
                             <p className="break-words text-slate-300">
-                              来源：{String(source.file_name || "")}
-                              {metadata.page ? ` / 第${String(metadata.page)}页` : ""}
+                              来源：{buildSourceLabel(source)}
                             </p>
                             <p className="break-words text-slate-500">
                               {metadata.raw_text ? `原文：${String(metadata.raw_text)}` : `原字段：${String(source.source_field || "")}`}
@@ -777,18 +817,31 @@ export function EvidenceExplorer({ view }: { view: AuditView }) {
   );
 }
 
-export function ConflictConfirmPanel({ view }: { view: AuditView }) {
+export function ConflictConfirmPanel({
+  view,
+  onConfirm,
+}: {
+  view: AuditView;
+  onConfirm?: (fieldKey: string, value: unknown) => void;
+}) {
   const conflicts = view.field_conflicts || [];
   const fieldSources = view.field_sources || {};
   const [manualValues, setManualValues] = useState<Record<string, string>>({});
   const [selection, setSelection] = useState<Record<string, string>>({});
   const [overrides, setOverrides] = useState<Array<Record<string, unknown>>>(view.user_overrides || []);
+  const [feedback, setFeedback] = useState<string>("");
   const sourceOptions = useMemo(
     () =>
       conflicts.map((conflict) => {
         const key = String(conflict.field || "");
-        const sources = (fieldSources[key] || []).filter((s) => s.source_type === "pdf" || s.source_type === "excel");
-        return { key, sources };
+        const sources = (fieldSources[key] || [])
+          .filter((s) => s.source_type === "pdf" || s.source_type === "excel")
+          .filter((s, i, arr) => arr.findIndex((x) => `${String(x.file_name || "")}|${String(x.source_field || "")}|${String(x.value ?? "")}` === `${String(s.file_name || "")}|${String(s.source_field || "")}|${String(s.value ?? "")}`) === i);
+        const numeric = sources.filter((s) => typeof s.value === "number").map((s) => Number(s.value));
+        const hasNonZero = numeric.some((v) => v !== 0);
+        const filtered = hasNonZero ? sources.filter((s) => !(typeof s.value === "number" && Number(s.value) === 0)) : sources;
+        const distinctValues = filtered.filter((s, i, arr) => arr.findIndex((x) => String(x.value ?? "") === String(s.value ?? "")) === i);
+        return { key, sources: distinctValues };
       }),
     [conflicts, fieldSources],
   );
@@ -828,10 +881,13 @@ export function ConflictConfirmPanel({ view }: { view: AuditView }) {
                 onClick={() => {
                   const selected = selection[fieldKey];
                   const selectedValue = selected === "manual" ? manualValues[fieldKey] || "" : options[Number((selected || "source-0").split("-")[1])]?.value;
+                  const sourceName = selected === "manual" ? "手动输入" : String(options[Number((selected || "source-0").split("-")[1])]?.source_type || "");
                   setOverrides((prev) => [
                     ...prev.filter((item) => String(item.field_key || "") !== fieldKey),
                     { field_key: fieldKey, selected_value: selectedValue, selected_by: "user_override", selected_at: new Date().toISOString() },
                   ]);
+                  onConfirm?.(fieldKey, selectedValue);
+                  setFeedback(`已采用 ${String(conflict.field_label || fieldKey)}：${sourceName}`);
                 }}
               >
                 确认
@@ -840,6 +896,7 @@ export function ConflictConfirmPanel({ view }: { view: AuditView }) {
           );
         })}
       </div>
+      {feedback && <p className="mt-3 text-xs text-emerald-300">{feedback}</p>}
       {overrides.length > 0 && <p className="mt-3 text-xs text-slate-400">已记录 {overrides.length} 条人工确认（当前为前端会话态）。</p>}
     </section>
   );
@@ -1002,18 +1059,40 @@ export function AuditorNotesPanel({ view }: { view: AuditView }) {
 }
 
 export function AuditWorkspace({ view }: { view: AuditView }) {
+  const [localOverrides, setLocalOverrides] = useState<Record<string, unknown>>({});
+  const effectiveView = useMemo(() => {
+    if (!Object.keys(localOverrides).length) return view;
+    const next = { ...view };
+    next.flat_standard_fields = { ...(view.flat_standard_fields || {}), ...localOverrides };
+    const nextOverview = { ...(view.project_overview || {}) };
+    Object.entries(localOverrides).forEach(([key, value]) => {
+      const entry = nextOverview[key];
+      if (entry) {
+        nextOverview[key] = {
+          ...entry,
+          value,
+          display_value: String(value ?? "未识别"),
+          source_type: "manual_required",
+          source_label: "人工确认覆盖（会话态）",
+        };
+      }
+    });
+    next.project_overview = nextOverview;
+    return next;
+  }, [view, localOverrides]);
+
   return (
     <div className="w-full space-y-6">
-      <IssueCardsPanel view={view} />
-      <ProjectOverviewPanel view={view} />
+      <IssueCardsPanel view={effectiveView} />
+      <ProjectOverviewPanel view={effectiveView} />
       <div className="grid w-full grid-cols-1 gap-6 xl:grid-cols-2">
-        <TimelineTracePanel view={view} />
-        <MaterialScanPanel view={view} />
+        <TimelineTracePanel view={effectiveView} />
+        <MaterialScanPanel view={effectiveView} />
       </div>
-      <ConflictConfirmPanel view={view} />
-      <EvidenceExplorer view={view} />
-      <PolicyMatchPanel view={view} />
-      <AuditorNotesPanel view={view} />
+      <ConflictConfirmPanel view={effectiveView} onConfirm={(fieldKey, value) => setLocalOverrides((prev) => ({ ...prev, [fieldKey]: value }))} />
+      <EvidenceExplorer view={effectiveView} />
+      <PolicyMatchPanel view={effectiveView} />
+      <AuditorNotesPanel view={effectiveView} />
     </div>
   );
 }

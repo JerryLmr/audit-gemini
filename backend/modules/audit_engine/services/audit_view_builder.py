@@ -368,7 +368,6 @@ def _material_scan(
         ("维修预案", _present_sheet(source_sheets, ["维修预案", "维修决案"]), _pdf_material_hit(pdf_parse_results, "repair_plan_pdf"), "建议补充维修预案、维修决案或实施方案材料。", True),
         ("业主征询意见/表决汇总", _present_sheet(source_sheets, ["业主征询意见", "业主表决汇总"]), _pdf_material_hit(pdf_parse_results, "vote_summary_pdf"), "建议补充业主征询意见或表决汇总材料。", True),
         ("业主大会决议", _present_sheet(source_sheets, ["业主大会决议"]), _pdf_material_hit(pdf_parse_results, "resolution_pdf"), "建议补充业主大会/业委会决议材料。", True),
-        ("维修工程实施方案", _present_sheet(source_sheets, ["维修预案", "维修决案"]), _pdf_material_hit(pdf_parse_results, "implementation_plan_pdf"), "建议补充维修工程实施方案。", True),
         ("施工合同", _present_sheet(source_sheets, ["施工合同表"]) if _bool_value(standard_fields, "has_construction_contract") is True or _has_sheet(source_sheets, ["施工合同表"]) else None, None, "建议补充施工合同或中标/委托文件。", True),
         ("审价合同", _present_sheet(source_sheets, ["审价合同"]) if _bool_value(standard_fields, "has_appraisal_contract") is True else None, None, "建议补充审价合同或造价咨询委托材料。", need_cost_review),
         ("审价报告", _present_sheet(source_sheets, ["审价报告", "预算审核报告"]) if _bool_value(standard_fields, "has_appraisal_report") is True else None, None, "建议补充审价报告或预算审核报告。", need_cost_review),

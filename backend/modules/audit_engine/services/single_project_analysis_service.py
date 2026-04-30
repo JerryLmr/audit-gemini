@@ -224,6 +224,15 @@ def _build_field_sources(standard_fields: Dict[str, Any]) -> Dict[str, List[Dict
                     "metadata": c.get("metadata") if isinstance(c.get("metadata"), dict) else {},
                 }
             )
+        # 收口去噪：同字段存在非 0 数值候选时，过滤 0 值候选，避免冲突区出现无效 0。
+        numeric_values = [s.get("value") for s in sources if isinstance(s.get("value"), (int, float))]
+        has_non_zero_numeric = any(float(v) != 0.0 for v in numeric_values)
+        if has_non_zero_numeric:
+            sources = [
+                s
+                for s in sources
+                if not (isinstance(s.get("value"), (int, float)) and float(s.get("value")) == 0.0)
+            ]
         if sources:
             field_sources[field_key] = sources
     return field_sources
